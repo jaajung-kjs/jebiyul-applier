@@ -28,8 +28,8 @@ def generate(params: dict, out_path: str) -> str:
 
 
 def _default_out() -> str:
-    """기본 출력 경로: ~/Desktop/적용근거_결과.xlsx."""
-    return os.path.join(os.path.expanduser("~"), "Desktop", "적용근거_결과.xlsx")
+    """기본 출력 경로: 현재 작업 디렉토리의 적용근거_결과.xlsx."""
+    return os.path.join(os.getcwd(), "적용근거_결과.xlsx")
 
 
 def main() -> None:
