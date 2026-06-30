@@ -58,6 +58,7 @@ class BandTable:
     headers: list = field(default_factory=list)
     rows: list = field(default_factory=list)
     criterion: str = ""
+    subheaders: list = field(default_factory=list)   # 2번째 헤더행(있으면 헤더 2행)
 
 
 def pct(rate: float) -> str:
@@ -125,6 +126,53 @@ def _ilban_band(jikjeop):
     return 3
 
 
+# ── 간접노무비/기타경비 구간표(50억 분기로 행 수가 변함) ───────────────────
+
+_DURS = [("6개월 이하 (183일)", "183"), ("7-12개월 (365일)", "365"),
+         ("13-36개월 (1095일)", "1095"), ("36개월 이상 (1096일)", "1096+")]
+_SIZE_LABEL = {"10억미만": "50억 미만", "10-50억": "50억 미만",
+               "50-300억": "50억 ~ 300억 미만", "300-1000억": "300억 ~ 1000억 미만",
+               "1000억이상": "1000억 이상"}
+# 기타경비 적용율 = 적용율(기준) × (간접노무비+산경비+일반관리비+이윤 구성비)
+_ETC_FACTOR = (19.3 + 30.2 + 17.8 + 12.3) / 100
+
+
+def _gibon_table(path, item, kind, jikjeop, days):
+    size = P.size_band(jikjeop)
+    dur_applied = P.duration_band(days)
+    is_etc = (item == "기타경비")
+    under50 = size in ("10억미만", "10-50억")
+    band = "10억미만" if under50 else size      # <50억은 50억미만 스케줄
+    rows = []
+    for i, (dlabel, dur) in enumerate(_DURS):
+        rate = lookup.table_rate(path, item, kind, band, dur)
+        cells = []
+        if i == 0:
+            cells.append((_SIZE_LABEL[band], 2, 2, None, len(_DURS)))  # 규모 세로 병합
+        cells.append((dlabel, 3, 4, None))
+        if is_etc:
+            comp = round(rate * _ETC_FACTOR, 3)
+            cells.append((rate, 5, 5, "0.0%"))
+            cells.append((comp, 6, 6, "0.0%"))
+        else:
+            cells.append((rate, 5, 6, "0.0%"))
+        rows.append(BandRow(cells, highlight=(dur == dur_applied)))
+    if under50:
+        rows.append(BandRow([("50억 이상", 2, 2, None),
+                             ("조달청 발표자료 참조(공사규모별, 기간별 적용율)", 3, 6, None)]))
+    headers = [("공사규모", 2, 2, 2), ("공사기간", 3, 4, 2)]
+    if is_etc:
+        headers += [("적용율", 5, 6, 1), ("적  용  기  준", 7, 10, 2)]
+        subheaders = [("기준", 5, 5), ("적용율", 6, 6)]
+        criterion = "(도급재료비 + 노무비) × 적용율"
+    else:
+        headers += [("적용율", 5, 6, 1), ("적  용  기  준", 7, 10, 2)]
+        subheaders = [("산업환경", 5, 6)]
+        criterion = "직접노무비 × 적용율"
+    return BandTable(kind="gibon", headers=headers, rows=rows,
+                     criterion=criterion, subheaders=subheaders)
+
+
 def _iyun_table(path, kind, jikjeop, contract):
     comp_applied = P.size_band(jikjeop)
     suui_applied = "1000억이상" if jikjeop >= 1e11 else "50-300억"
@@ -157,8 +205,11 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
     b: list = []
     b.append(Title("8. 공사비 산출 적용근거"))
 
-    # 1. 간접노무비 — 표는 Task 5에서. 지금은 섹션/근거/적용율만.
+    # 1. 간접노무비
     b.append(SectionHeader("1. 간접노무비", NOTE))
+    if jebiyul_path:
+        b.append(_gibon_table(jebiyul_path, "간접노무비", params["kind"],
+                              params["jikjeop_cost"], params["days"]))
     b.append(NoteLines([
         "    ☞ 공사규모별 적용기준 : 재료비 + 직접노무비 + 경비",
         "    ☞ 계상금액 : 직접노무비 × 적용율",
@@ -226,8 +277,11 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
     ]))
     b.append(AppliedRate("    ☞ 적 용 율 :  (사급재료비 제외시)", rates["산업안전보건관리비"], fmt="0.000%"))
     b.append(AppliedRate("    ☞ 적 용 율 :  (사급재료비 포함시)", rates["산업안전보건관리비"], fmt="0.000%"))
-    # 자. 기타경비 — 표는 Task 5.
+    # 자. 기타경비
     b.append(SubHeader(" 자. 기타 경비"))
+    if jebiyul_path:
+        b.append(_gibon_table(jebiyul_path, "기타경비", params["kind"],
+                              params["jikjeop_cost"], params["days"]))
     b.append(NoteLines([
         "    ☞ 공사규모별 적용기준 : 도급재료비 + 노무비 + 경비",
         "    ☞ 계상금액 : (도급재료비 + 노무비) × 적용율",

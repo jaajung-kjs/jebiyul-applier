@@ -82,3 +82,29 @@ def test_iyun_table_highlights_contract_size_row(monkeypatch):
     hi = [r for r in rows if r.highlight]
     assert len(hi) == 1
     assert any("50억원 이상" in str(c[0]) for c in hi[0].cells)
+
+
+def _gibon(monkeypatch, params):
+    _stub_lookup(monkeypatch)
+    blocks = M.build(params, RATES, jebiyul_path="DUMMY")
+    return [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "gibon"]
+
+
+def test_gibon_under_50_compact_with_reference_row(monkeypatch):
+    params = dict(PARAMS, jikjeop_cost=3_000_000_000, days=120)  # 30억 <50억, 183일
+    tables = _gibon(monkeypatch, params)
+    assert len(tables) == 2  # 간접노무비 + 기타경비
+    t = tables[0]
+    labels = [str(r.cells[0][0]) for r in t.rows]
+    assert "50억 미만" in labels[0]
+    assert any("50억 이상" in l for l in labels)        # 참조행 존재
+    hi = [r for r in t.rows if r.highlight]
+    assert len(hi) == 1
+
+
+def test_gibon_over_50_expands_actual_band(monkeypatch):
+    params = dict(PARAMS, jikjeop_cost=100_000_000_000, days=400)  # 1000억, 365일
+    t = _gibon(monkeypatch, params)[0]
+    labels = [str(r.cells[0][0]) for r in t.rows]
+    assert any("1000억" in l for l in labels)
+    assert all("조달청 발표자료 참조" not in str(r.cells) for r in t.rows)

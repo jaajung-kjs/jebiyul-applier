@@ -114,12 +114,19 @@ def _emit_applied(ws, block, cur):
 
 
 def _emit_table(ws, block, cur):
-    # 헤더행
+    # 헤더행(1~2행)
     hr = cur.take(1)
     ws.row_dimensions[hr].height = styles.ROW_BODY_H
-    for text, c0, c1 in block.headers:
+    for h in block.headers:
+        text, c0, c1, rowspan = _norm_header(h)
         _put(ws, hr, c0, c1, text, fill=styles.header_fill(),
-             align=styles.center(wrap=True), border=True)
+             align=styles.center(wrap=True), border=True, rowspan=rowspan)
+    if block.subheaders:
+        sr = cur.take(1)
+        ws.row_dimensions[sr].height = styles.ROW_BODY_H
+        for text, c0, c1 in block.subheaders:
+            _put(ws, sr, c0, c1, text, fill=styles.header_fill(),
+                 align=styles.center(wrap=True), border=True)
     # 데이터행
     first = cur.row
     for brow in block.rows:
@@ -143,6 +150,14 @@ def _norm_cell(cell):
         return cell
     value, c0, c1, fmt = cell
     return value, c0, c1, fmt, 1
+
+
+def _norm_header(h):
+    """(text, c0, c1[, rowspan]) → 4-튜플로 정규화."""
+    if len(h) == 4:
+        return h
+    text, c0, c1 = h
+    return text, c0, c1, 1
 
 
 def _put(ws, row, c0, c1, value, fill=None, align=None, border=False, fmt=None, rowspan=1):
