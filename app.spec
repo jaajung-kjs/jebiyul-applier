@@ -28,7 +28,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='적용근거생성기',
+    name='JebiyulApplier',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -1,0 +1,56 @@
+name: build-exe
+
+# main 푸시 또는 v* 태그 푸시 시 Windows에서 exe를 빌드하고
+# Release에 업로드하여 온라인에서 바로 내려받을 수 있게 한다.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        # 제비율 원본 파일이 없는 CI에서는 골든 테스트가 자동 skip 된다.
+        run: python -m pytest -q
+
+      - name: Build exe (PyInstaller)
+        run: pyinstaller app.spec
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JebiyulApplier-windows
+          path: dist/JebiyulApplier.exe
+          if-no-files-found: error
+
+      - name: Publish rolling "latest" release (main push)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "최신 빌드 (latest)"
+          body: "main 최신 커밋에서 자동 빌드된 Windows 실행파일입니다."
+          prerelease: true
+          files: dist/JebiyulApplier.exe
+
+      - name: Publish versioned release (tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "적용근거 생성기 ${{ github.ref_name }}"
+          files: dist/JebiyulApplier.exe
