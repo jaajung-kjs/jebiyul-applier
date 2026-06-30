@@ -8,6 +8,7 @@
   gonggu_rate() -> float
   fixed_rate(path, item) -> float
   sanan_rate(path, target_band) -> dict
+  compute_rates(path, params) -> dict[str, float]
 """
 import re
 import openpyxl
@@ -347,3 +348,53 @@ def sanan_rate(path: str, target_band: str) -> dict:
     base_won = int(float(base_raw) * 1000) if base_raw is not None else None
 
     return {"rate": rate, "기초액": base_won}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12개 항목 적용율 일괄 산출
+# ─────────────────────────────────────────────────────────────────────────────
+
+def compute_rates(path: str, params: dict) -> dict:
+    """파라미터 dict를 받아 12개 항목 적용율(소수)을 한 번에 반환한다.
+
+    Parameters
+    ----------
+    path : str
+        제비율 xlsx 파일 경로.
+    params : dict
+        jikjeop_cost : int   직접공사비 (원)
+        days         : int   공사기간 (일)
+        kind         : str   공사종류 ('토목', '건축', '조경', …)
+        contract     : str   계약방법 ('경쟁' | '수의')
+        sanjae_basis : str   산재보험료 기준 ('한전' | '조달청')
+        sanan_target : int   산안비 대상액 (원)
+
+    Returns
+    -------
+    dict[str, float]
+        12개 항목 키에 대한 소수 적용율.
+        키: 간접노무비, 공구손료, 산재보험료, 고용보험료, 건강보험료, 연금보험료,
+            퇴직공제부금비, 노인장기요양보험료, 산업안전보건관리비, 기타경비, 일반관리비, 이윤.
+    """
+    from src import params as P
+
+    size = P.size_band(params["jikjeop_cost"])
+    dur = P.duration_band(params["days"])
+    kind = params["kind"]
+    contract = params["contract"]
+    sanan = P.sanan_band(params["sanan_target"])
+
+    return {
+        "간접노무비":         table_rate(path, "간접노무비",   kind, size, dur),
+        "공구손료":           gonggu_rate(),
+        "산재보험료":         sanjae_rate(params["sanjae_basis"]),
+        "고용보험료":         fixed_rate(path, "고용보험료"),
+        "건강보험료":         fixed_rate(path, "건강보험료"),
+        "연금보험료":         fixed_rate(path, "연금보험료"),
+        "퇴직공제부금비":     fixed_rate(path, "퇴직공제부금비"),
+        "노인장기요양보험료": fixed_rate(path, "노인장기요양보험료"),
+        "산업안전보건관리비": sanan_rate(path, sanan)["rate"],
+        "기타경비":           table_rate(path, "기타경비",     kind, size, dur),
+        "일반관리비":         table_rate(path, "일반관리비",   kind, size, dur),
+        "이윤":               table_rate(path, "이윤",         kind, size, dur, contract),
+    }
