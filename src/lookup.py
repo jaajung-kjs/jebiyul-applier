@@ -8,6 +8,11 @@
 import openpyxl
 from src import mapping
 
+# 조달청 수의계약 이윤율 기준 (파일에서 읽지 않고 정책값으로 고정).
+# 출처: 조달청 수의계약 기준 (간접공사비 적용기준 고시 외 별도 기준).
+SUUI_IYUN_UNDER_1000 = 0.10  # 공사규모 1000억 미만 수의계약 이윤율
+SUUI_IYUN_OVER_1000  = 0.09  # 공사규모 1000억 이상 수의계약 이윤율
+
 
 def cell_text_search(ws, label):
     """시트에서 label로 시작하는 셀을 찾아 (row, col)을 반환한다.
@@ -71,8 +76,12 @@ def table_rate(path, item, kind, size, duration, contract=None):
         공사기간 밴드 — params.duration_band() 반환값.
         일반관리비·이윤은 기간 무관이므로 이 인수는 무시됨.
     contract : str | None
-        이윤 계약방법 ('경쟁' 또는 '수의'). 현재 조달청 파일은 단일 요율 열만
-        제공하므로 이 인수는 무시된다. Task 6 인터페이스 호환용으로 포함.
+        계약방법 ('경쟁' 또는 '수의').
+        이윤(이윤)에 한해 반영됨:
+          - '수의' → 조달청 수의계약 기준값 (SUUI_IYUN_UNDER_1000 / SUUI_IYUN_OVER_1000)
+            을 하드코딩으로 반환한다. 파일값을 사용하지 않는다.
+          - None 또는 '경쟁' → 파일에서 읽은 경쟁계약 이윤율을 반환한다.
+        다른 항목(간접노무비·기타경비·일반관리비)에서는 무시된다.
 
     Returns
     -------
@@ -84,6 +93,12 @@ def table_rate(path, item, kind, size, duration, contract=None):
     LookupError
         앵커 미발견 또는 해당 셀이 비어 있을 때.
     """
+    # 수의계약 이윤율: 파일 대신 조달청 정책값을 바로 반환.
+    if item == "이윤" and contract == "수의":
+        if size == "1000억이상":
+            return SUUI_IYUN_OVER_1000
+        return SUUI_IYUN_UNDER_1000
+
     src_kind = mapping.rate_source_kind(item, kind)
 
     wb = openpyxl.load_workbook(path, data_only=True)
