@@ -248,6 +248,22 @@ def _band_norm(text: str) -> str:
     return text.strip().replace("\n", "").replace(" ", "")
 
 
+# params.sanan_band() 정규(canonical) 키 → 파일 내 정규화 텍스트 매핑.
+#
+# 파일 원문(정규화 전/후):
+#   "5억 미만"              → "5억미만"
+#   "5억 ~ \n50억 미만"     → "5억~50억미만"
+#   "50억 이상"             → "50억이상"
+# "2천만미만"은 파일에 별도 행 없음 — 산업안전보건관리비는 총 공사금액 2천만 원 이상
+# 건설공사부터 적용되므로 미만 구간은 요율 0으로 처리한다.
+_SANAN_CANONICAL_TO_FILE: dict[str, str | None] = {
+    "2천만미만": None,           # 파일에 해당 행 없음 → 요율 0 반환
+    "5억미만":   "5억미만",      # 파일: "5억 미만"
+    "5-50억":    "5억~50억미만", # 파일: "5억 ~ \n50억 미만"
+    "50억이상":  "50억이상",     # 파일: "50억 이상"
+}
+
+
 def sanan_rate(path: str, target_band: str) -> dict:
     """산안비 대상액 구간별 토목공사 요율과 기초액을 반환한다.
 
@@ -312,7 +328,16 @@ def sanan_rate(path: str, target_band: str) -> dict:
 
     # 3. 대상액 구간 행 탐색 (anc_col 열에서 정규화 비교)
     # NOTE: "50억이상"은 800억미만 sub-band만 반환 — 800억 이상 공사는 부정확
-    norm_target = _band_norm(target_band)
+    #
+    # canonical 키(params.sanan_band 반환값) → 파일 내 정규화 텍스트로 변환.
+    # "2천만미만"은 파일에 행 없으므로 즉시 요율 0 반환.
+    if target_band in _SANAN_CANONICAL_TO_FILE:
+        file_key = _SANAN_CANONICAL_TO_FILE[target_band]
+        if file_key is None:
+            return {"rate": 0.0, "기초액": None}
+        norm_target = file_key
+    else:
+        norm_target = _band_norm(target_band)
     band_row = None
     for r in range(hdr_row + 1, anc_row + 60):
         v = ws.cell(r, anc_col).value

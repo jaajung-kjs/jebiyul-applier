@@ -66,3 +66,17 @@ def test_compute_iyun_gyeongjaeng(tomok_path):
     params = dict(_IYUN_PARAMS_BASE, contract="경쟁")
     rates = compute_rates(tomok_path, params)
     assert rates["이윤"] == pytest.approx(0.12)
+
+
+def test_compute_sanan_5_50eok_range(tomok_path):
+    """sanan_target 10억(5억~50억 구간) → 산업안전보건관리비 = 2.53% (기초액 미반영).
+
+    fix 전에는 sanan_band('5-50억') → sanan_rate 파일 불일치로 LookupError 발생.
+    fix 후 compute_rates가 정상 종료되어야 하고 산안비 율은 0.0253이어야 한다.
+    """
+    params = dict(
+        _BASE_PARAMS,
+        sanan_target=1_000_000_000,  # 10억 → sanan_band → "5-50억"
+    )
+    rates = compute_rates(tomok_path, params)
+    assert rates["산업안전보건관리비"] == pytest.approx(0.0253, abs=1e-4)
