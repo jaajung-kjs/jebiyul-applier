@@ -114,5 +114,53 @@ def _emit_applied(ws, block, cur):
 
 
 def _emit_table(ws, block, cur):
-    # Task 4~5에서 구현. 현재는 건너뛴다.
-    return
+    # 헤더행
+    hr = cur.take(1)
+    ws.row_dimensions[hr].height = styles.ROW_BODY_H
+    for text, c0, c1 in block.headers:
+        _put(ws, hr, c0, c1, text, fill=styles.header_fill(),
+             align=styles.center(wrap=True), border=True)
+    # 데이터행
+    first = cur.row
+    for brow in block.rows:
+        r = cur.take(1)
+        ws.row_dimensions[r].height = styles.ROW_BODY_H
+        fill = styles.highlight_fill() if brow.highlight else None
+        for cell in brow.cells:
+            value, c0, c1, fmt, rowspan = _norm_cell(cell)
+            _put(ws, r, c0, c1, value, fill=fill, align=styles.center(),
+                 border=True, fmt=fmt, rowspan=rowspan)
+    last = cur.row - 1
+    # 적용기준 세로 병합 블록(G:J)
+    if block.criterion:
+        _put(ws, first, 7, 10, block.criterion, align=styles.center(wrap=True),
+             border=True, rowspan=last - first + 1)
+
+
+def _norm_cell(cell):
+    """(value, c0, c1, fmt[, rowspan]) → 5-튜플로 정규화."""
+    if len(cell) == 5:
+        return cell
+    value, c0, c1, fmt = cell
+    return value, c0, c1, fmt, 1
+
+
+def _put(ws, row, c0, c1, value, fill=None, align=None, border=False, fmt=None, rowspan=1):
+    r1 = row + rowspan - 1
+    a = f"{get_column_letter(c0)}{row}"
+    if c1 > c0 or r1 > row:
+        ws.merge_cells(f"{a}:{get_column_letter(c1)}{r1}")
+    c = ws[a]
+    c.value = value
+    c.font = styles.body_font()
+    if align:
+        c.alignment = align
+    if fill:
+        c.fill = fill
+    if fmt:
+        c.number_format = fmt
+    if border:
+        b = styles.box_border()
+        for rr in range(row, r1 + 1):
+            for col in range(c0, c1 + 1):
+                ws.cell(rr, col).border = b

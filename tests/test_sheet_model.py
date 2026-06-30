@@ -41,3 +41,44 @@ def test_applied_rate_blocks_carry_decimal_value():
 def test_pct_helper():
     assert M.pct(0.03626) == "3.626"
     assert M.pct(0.03) == "3"
+
+
+def _stub_lookup(monkeypatch):
+    """build()가 부르는 모든 제비율 조회를 가짜로 대체(파일 불필요)."""
+    import src.sheet_model as SM
+    monkeypatch.setattr(SM.lookup, "sanan_rate",
+                        lambda p, band: {"rate": 0.0315, "기초액": None})
+    monkeypatch.setattr(SM.lookup, "table_rate", lambda *a, **k: 0.12)
+
+
+def test_sanan_table_four_bands_highlight_applicable(monkeypatch):
+    _stub_lookup(monkeypatch)
+    params = dict(PARAMS, sanan_target=300_000_000)  # 5억 미만
+    blocks = M.build(params, RATES, jebiyul_path="DUMMY")
+    t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "sanan"][0]
+    assert len(t.rows) == 4
+    hi = [r for r in t.rows if r.highlight]
+    assert len(hi) == 1
+    assert any("5억원 미만" in str(c[0]) for c in hi[0].cells)
+
+
+def test_ilban_table_highlights_applicable_size(monkeypatch):
+    _stub_lookup(monkeypatch)
+    params = dict(PARAMS, jikjeop_cost=7_000_000_000)  # 30~100억
+    blocks = M.build(params, RATES, jebiyul_path="DUMMY")
+    t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "ilban"][0]
+    assert len(t.rows) == 4
+    hi = [r for r in t.rows if r.highlight]
+    assert len(hi) == 1
+    assert any("30억원 이상" in str(c[0]) for c in hi[0].cells)
+
+
+def test_iyun_table_highlights_contract_size_row(monkeypatch):
+    _stub_lookup(monkeypatch)
+    params = dict(PARAMS, contract="경쟁", jikjeop_cost=7_000_000_000)  # 50~300억
+    blocks = M.build(params, RATES, jebiyul_path="DUMMY")
+    t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "iyun"][0]
+    rows = t.rows
+    hi = [r for r in rows if r.highlight]
+    assert len(hi) == 1
+    assert any("50억원 이상" in str(c[0]) for c in hi[0].cells)
