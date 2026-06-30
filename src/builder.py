@@ -1,20 +1,34 @@
 """표준 템플릿에 율을 기입해 결과 xlsx 저장."""
 import os
+import sys
 import shutil
 
 import openpyxl
 
-# Single source of truth: import ITEMS from the template module so that the
-# cell-row mapping here can never silently drift from the template layout.
-# tools/ already has __init__.py so this import works from the repo root.
-from tools.build_template import ITEMS
+# Canonical item list — single source of truth for the runtime package.
+# Order must match the template row layout: row = 3 + i*2 (i = 0..11).
+# tools/build_template.py imports from here at dev time; the reverse is NOT
+# allowed (tools/ is not shipped in the PyInstaller bundle).
+ITEMS = [
+    "간접노무비",
+    "공구손료",
+    "산재보험료",
+    "고용보험료",
+    "건강보험료",
+    "연금보험료",
+    "퇴직공제부금비",
+    "노인장기요양보험료",
+    "산업안전보건관리비",
+    "기타경비",
+    "일반관리비",
+    "이윤",
+]
 
 # Absolute path to the bundled template asset.
-_ASSET = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)),
-    "assets",
-    "template_적용근거.xlsx",
-)
+# When running inside a PyInstaller --onefile bundle, sys._MEIPASS points to
+# the temporary extraction directory; otherwise fall back to the repo root.
+_BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ASSET = os.path.join(_BASE, "assets", "template_적용근거.xlsx")
 
 # 항목 → 율 기입 셀 좌표.  템플릿 계약: A열 라벨은 행 3,5,7,…(3+i*2), 율은 I열 동일 행.
 CELL_MAP: dict[str, str] = {item: f"I{3 + i * 2}" for i, item in enumerate(ITEMS)}

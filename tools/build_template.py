@@ -2,22 +2,9 @@
 import openpyxl
 from openpyxl.styles import Font
 
-# 12개 항목 — Task 8 CELL_MAP 계약과 순서가 동일해야 함.
-# rate cell = I{3 + i*2}  (i = 0..11)
-ITEMS = [
-    "간접노무비",
-    "공구손료",
-    "산재보험료",
-    "고용보험료",
-    "건강보험료",
-    "연금보험료",
-    "퇴직공제부금비",
-    "노인장기요양보험료",
-    "산업안전보건관리비",
-    "기타경비",
-    "일반관리비",
-    "이윤",
-]
+# ITEMS is the canonical list defined in the runtime package.
+# Import it here so this dev-time generator stays in sync automatically.
+from src.builder import ITEMS
 
 
 def build(path: str = "assets/template_적용근거.xlsx") -> None:

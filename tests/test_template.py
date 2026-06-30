@@ -6,7 +6,7 @@ import os
 import openpyxl
 import pytest
 
-from tools.build_template import ITEMS
+from src.builder import ITEMS
 
 TEMPLATE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
