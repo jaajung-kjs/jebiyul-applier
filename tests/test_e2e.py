@@ -8,9 +8,8 @@ import pytest
 from src.main import generate
 from src.lookup import compute_rates
 
-# 12개 항목 순서 (builder.py CELL_MAP 계약: I{3 + i*2})
-# 간접노무비 = ITEMS[0] → I3 → row 3, col 9
-_GANJEOP_NOMU_CELL = (3, 9)  # (row, col) 1-based
+# 간접노무비 헤드라인 ☞ 적용율 셀 = I14 (마스터 양식 좌표)
+_GANJEOP_NOMU_CELL = (14, 9)  # (row, col) 1-based
 
 
 @pytest.fixture
@@ -39,7 +38,7 @@ def test_generate_tomok(base_params, tmp_path):
 
 
 def test_generate_pipeline_ganjeop_nomu_cell(base_params, tmp_path):
-    """간접노무비 rate가 compute_rates와 일치하며 올바른 셀(I3)에 기입된다.
+    """간접노무비 rate가 compute_rates와 일치하며 올바른 셀(I14)에 기입된다.
 
     파이프라인 검증: params → compute_rates → build_output → 셀 값 확인.
     단순히 '어떤 값이 있다'가 아니라 '올바른 값이 올바른 셀에' 있음을 검증한다.
@@ -50,13 +49,13 @@ def test_generate_pipeline_ganjeop_nomu_cell(base_params, tmp_path):
     # 2. generate() 로 결과 파일 생성
     out = generate(base_params, str(tmp_path / "out2.xlsx"))
 
-    # 3. 간접노무비 셀(I3 = row 3, col 9) 값 검증
+    # 3. 간접노무비 헤드라인 셀(I14) 값 검증
     ws = openpyxl.load_workbook(out)["적용근거"]
     row, col = _GANJEOP_NOMU_CELL
     actual = ws.cell(row, col).value
 
     assert actual == pytest.approx(expected_rate, rel=1e-6), (
-        f"간접노무비 셀 I3 값 불일치: actual={actual!r}, expected={expected_rate!r}"
+        f"간접노무비 셀 I14 값 불일치: actual={actual!r}, expected={expected_rate!r}"
     )
 
 

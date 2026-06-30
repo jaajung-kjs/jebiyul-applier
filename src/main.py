@@ -23,7 +23,8 @@ def generate(params: dict, out_path: str) -> str:
         저장된 파일 경로 (out_path 와 동일).
     """
     rates = compute_rates(params["jebiyul_path"], params)
-    return build_output(rates, out_path)
+    return build_output(rates, out_path, params=params,
+                        jebiyul_path=params["jebiyul_path"])
 
 
 def _default_out() -> str:

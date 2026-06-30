@@ -1,96 +1,75 @@
-"""Tests for src/builder.py — Output builder (Task 8).
-
-TDD: test_build_writes_rates and test_cell_map_matches_template_layout run first.
-"""
+"""src/builder.py — 마스터 양식에 값 채우기 검증."""
 import os
+
 import openpyxl
 import pytest
 
-from src.builder import build_output, CELL_MAP, ITEMS
-
-TEMPLATE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)),
-    "assets",
-    "template_적용근거.xlsx",
-)
+from src.builder import build_output, HEADLINE_CELL
 
 SAMPLE_RATES = {
-    "간접노무비": 0.191,
+    "간접노무비": 0.195,
     "공구손료": 0.03,
     "산재보험료": 0.03656,
     "고용보험료": 0.0101,
-    "건강보험료": 0.03545,
-    "연금보험료": 0.045,
+    "건강보험료": 0.03595,
+    "연금보험료": 0.0475,
     "퇴직공제부금비": 0.023,
-    "노인장기요양보험료": 0.1295,
-    "산업안전보건관리비": 0.0185,
-    "기타경비": 0.055,
+    "노인장기요양보험료": 0.1314,
+    "산업안전보건관리비": 0.0315,
+    "기타경비": 0.057,
     "일반관리비": 0.08,
     "이윤": 0.15,
 }
 
 
-def test_build_writes_rates(tmp_path):
-    """build_output copies the template and writes rate values into the I column."""
-    out = build_output(SAMPLE_RATES, str(tmp_path / "out.xlsx"))
-    wb = openpyxl.load_workbook(out)
-    ws = wb["적용근거"]
-    vals = [
-        ws.cell(r, c).value
-        for r in range(1, ws.max_row + 1)
-        for c in range(1, ws.max_column + 1)
-    ]
-    assert 0.191 in vals
-    assert 0.03656 in vals
-
-
 def test_build_returns_path(tmp_path):
-    """build_output must return the output file path."""
     out_path = str(tmp_path / "out.xlsx")
-    result = build_output(SAMPLE_RATES, out_path)
-    assert result == out_path
-    assert os.path.isfile(result)
+    assert build_output(SAMPLE_RATES, out_path) == out_path
+    assert os.path.isfile(out_path)
 
 
-def test_all_rates_written(tmp_path):
-    """Every item in SAMPLE_RATES must be written to the expected cell."""
+def test_headline_cells_written(tmp_path):
+    """헤드라인 ☞ 적용율 셀(I열)에 각 항목 율이 들어간다."""
     out = build_output(SAMPLE_RATES, str(tmp_path / "out.xlsx"))
-    wb = openpyxl.load_workbook(out)
-    ws = wb["적용근거"]
-    for item, rate in SAMPLE_RATES.items():
-        cell_addr = CELL_MAP[item]
-        assert ws[cell_addr].value == rate, (
-            f"Item '{item}' expected rate {rate} at {cell_addr}, "
-            f"got {ws[cell_addr].value}"
+    ws = openpyxl.load_workbook(out)["적용근거"]
+    for item, cell in HEADLINE_CELL.items():
+        assert ws[cell].value == pytest.approx(SAMPLE_RATES[item]), (
+            f"{item} → {cell} 불일치: {ws[cell].value}"
         )
+    # 산안비 '사급 포함시'(I55)도 동일값
+    assert ws["I55"].value == pytest.approx(SAMPLE_RATES["산업안전보건관리비"])
 
 
-def test_cell_map_matches_template_layout():
-    """Contract-pinning test: CELL_MAP rows must match column-A label rows in the template.
+def test_inline_rate_text_rewritten(tmp_path):
+    """설명 문구에 박힌 보험요율이 갱신된 율로 다시 써진다."""
+    out = build_output(SAMPLE_RATES, str(tmp_path / "out.xlsx"))
+    ws = openpyxl.load_workbook(out)["적용근거"]
+    assert "3.656%" in ws["A23"].value      # 산재
+    assert "3.595%" in ws["A32"].value      # 건강
+    assert "13.14%" in ws["A44"].value      # 노인장기요양
 
-    If build_template.py ITEMS order ever changes, this test catches the mismatch
-    before rates get silently written to the wrong cells.
-    """
-    wb = openpyxl.load_workbook(TEMPLATE_PATH)
-    ws = wb["적용근거"]
 
-    # Build a lookup: label → row number from actual template column A
-    template_label_row: dict[str, int] = {}
-    for r in range(1, ws.max_row + 1):
-        val = ws.cell(row=r, column=1).value
-        if val in ITEMS:
-            template_label_row[val] = r
+def test_structure_preserved(tmp_path):
+    """값만 채우고 양식(섹션 헤더·병합)은 그대로 유지된다."""
+    out = build_output(SAMPLE_RATES, str(tmp_path / "out.xlsx"))
+    ws = openpyxl.load_workbook(out)["적용근거"]
+    assert ws["A2"].value == "8. 공사비 산출 적용근거"
+    assert "산업안전보건관리비" in ws["A45"].value
+    assert len(ws.merged_cells.ranges) > 50
 
-    for item in ITEMS:
-        assert item in template_label_row, (
-            f"Item '{item}' not found in template column A"
-        )
-        actual_template_row = template_label_row[item]
-        builder_cell = CELL_MAP[item]          # e.g. "I3"
-        builder_row = int(builder_cell[1:])    # strip "I" prefix → int
 
-        assert builder_row == actual_template_row, (
-            f"CELL_MAP mismatch for '{item}': builder targets row {builder_row} "
-            f"(cell {builder_cell}) but template has the label at row {actual_template_row}. "
-            "Update ITEMS order in build_template.py or src/builder.py to fix."
-        )
+def test_tables_filled_from_file(tomok_path, tmp_path):
+    """params+제비율 경로가 주어지면 간접노무비/산안비/이윤 구간표가 파일값으로 채워진다."""
+    params = dict(jikjeop_cost=500_000_000, days=200, kind="토목", contract="경쟁",
+                  sanjae_basis="한전", sanan_target=400_000_000, jebiyul_path=tomok_path)
+    out = build_output(SAMPLE_RATES, str(tmp_path / "out.xlsx"),
+                       params=params, jebiyul_path=tomok_path)
+    ws = openpyxl.load_workbook(out)["적용근거"]
+    # 간접노무비표: 이번 규모(10억미만) 라벨 + 183일 값
+    assert ws["B7"].value == "10억 미만"
+    assert ws["E7"].value == pytest.approx(0.191)
+    # 이윤표 경쟁 50억미만 = 0.15, 수의 1000억이상 = 0.09
+    assert ws["F87"].value == pytest.approx(0.15)
+    assert ws["F92"].value == pytest.approx(0.09)
+    # 산안비 5억미만 구간
+    assert ws["D48"].value == pytest.approx(0.0315)
