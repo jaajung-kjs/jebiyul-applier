@@ -1,15 +1,14 @@
 """엔드투엔드: generate() 파이프라인 검증.
 
-파이프라인: params -> compute_rates -> build_output -> 결과 xlsx.
+파이프라인: params -> compute_rates -> build_output(model→render) -> 결과 xlsx.
+템플릿 복사 없이 코드로 시트를 그린다.
 """
 import openpyxl
 import pytest
 
 from src.main import generate
 from src.lookup import compute_rates
-
-# 간접노무비 헤드라인 ☞ 적용율 셀 = I14 (마스터 양식 좌표)
-_GANJEOP_NOMU_CELL = (14, 9)  # (row, col) 1-based
+from src import builder
 
 
 @pytest.fixture
@@ -20,46 +19,60 @@ def base_params(tomok_path):
         kind="토목",
         contract="경쟁",
         sanjae_basis="한전",
-        sanan_target=400_000_000,  # 5억미만 구간 — 800억 issue 무관
+        sanan_target=400_000_000,  # 5억미만 구간
         jebiyul_path=tomok_path,
     )
 
 
+def _all_values(ws):
+    return [ws.cell(r, c).value
+            for r in range(1, ws.max_row + 1)
+            for c in range(1, ws.max_column + 1)]
+
+
 def test_generate_tomok(base_params, tmp_path):
-    """generate()가 결과 xlsx를 생성하고 산재보험료(한전) 값을 포함한다."""
+    """generate()가 결과 xlsx를 생성하고 산재보험료(한전) 적용율을 포함한다."""
     out = generate(base_params, str(tmp_path / "out.xlsx"))
     ws = openpyxl.load_workbook(out)["적용근거"]
-    vals = [
-        ws.cell(r, c).value
-        for r in range(1, ws.max_row + 1)
-        for c in range(1, ws.max_column + 1)
-    ]
-    assert 0.03656 in vals  # 산재 한전
+    assert 0.03656 in _all_values(ws)  # 산재 한전
 
 
-def test_generate_pipeline_ganjeop_nomu_cell(base_params, tmp_path):
-    """간접노무비 rate가 compute_rates와 일치하며 올바른 셀(I14)에 기입된다.
-
-    파이프라인 검증: params → compute_rates → build_output → 셀 값 확인.
-    단순히 '어떤 값이 있다'가 아니라 '올바른 값이 올바른 셀에' 있음을 검증한다.
-    """
-    # 1. compute_rates 결과를 직접 계산 (참값)
-    expected_rate = compute_rates(base_params["jebiyul_path"], base_params)["간접노무비"]
-
-    # 2. generate() 로 결과 파일 생성
+def test_generate_ganjeop_rate_present(base_params, tmp_path):
+    """간접노무비 적용율(compute_rates 참값)이 시트에 기입된다."""
+    expected = compute_rates(base_params["jebiyul_path"], base_params)["간접노무비"]
     out = generate(base_params, str(tmp_path / "out2.xlsx"))
-
-    # 3. 간접노무비 헤드라인 셀(I14) 값 검증
     ws = openpyxl.load_workbook(out)["적용근거"]
-    row, col = _GANJEOP_NOMU_CELL
-    actual = ws.cell(row, col).value
-
-    assert actual == pytest.approx(expected_rate, rel=1e-6), (
-        f"간접노무비 셀 I14 값 불일치: actual={actual!r}, expected={expected_rate!r}"
-    )
+    vals = [v for v in _all_values(ws) if isinstance(v, (int, float))]
+    assert any(abs(v - expected) < 1e-9 for v in vals)
 
 
 def test_generate_does_not_raise(base_params, tmp_path):
-    """generate()가 예외 없이 완료된다."""
     out = generate(base_params, str(tmp_path / "out3.xlsx"))
     assert out.endswith(".xlsx")
+
+
+def test_build_output_no_template_dependency(tmp_path, tomok_path):
+    """build_output이 템플릿 복사 없이 코드로 시트를 그린다(<50억 → 참조행)."""
+    params = dict(kind="토목", jikjeop_cost=3_000_000_000, days=120,
+                  contract="경쟁", sanjae_basis="한전", sanan_target=300_000_000)
+    rates = compute_rates(tomok_path, params)
+    out = str(tmp_path / "r.xlsx")
+    builder.build_output(rates, out, params=params, jebiyul_path=tomok_path)
+    ws = openpyxl.load_workbook(out)["적용근거"]
+    assert ws["A2"].value == "8. 공사비 산출 적용근거"
+    texts = [str(v) for v in _all_values(ws) if v]
+    assert any("공사규모" in t for t in texts)
+    assert any("50억 이상" in t for t in texts)  # 30억 → 압축형 참조행
+
+
+def test_build_output_over_50_expands(tmp_path, tomok_path):
+    """≥50억이면 참조행 대신 실제 규모구간이 펼쳐진다."""
+    params = dict(kind="토목", jikjeop_cost=100_000_000_000, days=400,
+                  contract="수의", sanjae_basis="조달청", sanan_target=20_000_000_000)
+    rates = compute_rates(tomok_path, params)
+    out = str(tmp_path / "big.xlsx")
+    builder.build_output(rates, out, params=params, jebiyul_path=tomok_path)
+    ws = openpyxl.load_workbook(out)["적용근거"]
+    texts = [str(v) for v in _all_values(ws) if v]
+    assert any("1000억 이상" in t for t in texts)
+    assert not any("조달청 발표자료 참조" in t for t in texts)

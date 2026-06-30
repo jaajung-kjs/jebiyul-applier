@@ -8,7 +8,7 @@ a = Analysis(
     ['src/main.py'],
     pathex=['.'],
     binaries=[],
-    datas=[('assets/template_적용근거.xlsx', 'assets')],
+    datas=[],  # 적용근거 양식은 코드(src/styles.py, src/renderer.py)로 그리므로 템플릿 번들 불필요
     hiddenimports=['openpyxl'],
     hookspath=[],
     hooksconfig={},
