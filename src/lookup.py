@@ -160,16 +160,8 @@ _FIXED_LABEL = {
 }
 
 # 파일에 요율이 "(직노) x 3.595" 같은 텍스트 셀로 저장되어 있다.
-# 마지막 십진수를 정규식으로 추출한다.
-_RE_LAST_NUM = re.compile(r"[\d]+(?:\.[\d]+)?")
-
-
-def _extract_rate_from_formula_text(text: str) -> float:
-    """'(직노) x 3.595' 같은 텍스트에서 마지막 숫자를 파싱한다."""
-    matches = _RE_LAST_NUM.findall(text)
-    if not matches:
-        raise LookupError(f"수식 텍스트에서 숫자를 찾지 못함: {text!r}")
-    return float(matches[-1])
+# 'x <숫자>' 패턴으로 요율을 추출한다.
+_RE_X_NUM = re.compile(r"\bx\s+([\d]+(?:\.[\d]+)?)")
 
 
 def _formula_rate_near(ws, anchor_row: int, anchor_col: int, span: int = 8) -> float:
@@ -177,12 +169,11 @@ def _formula_rate_near(ws, anchor_row: int, anchor_col: int, span: int = 8) -> f
 
     탐색 범위: anchor_row ~ anchor_row+span, anchor_col ~ anchor_col+span.
     """
-    _re_x_num = re.compile(r"\bx\s+([\d]+(?:\.[\d]+)?)")
     for r in range(anchor_row, anchor_row + span):
         for c in range(anchor_col, anchor_col + span):
             v = ws.cell(r, c).value
             if isinstance(v, str):
-                m = _re_x_num.search(v)
+                m = _RE_X_NUM.search(v)
                 if m:
                     return float(m.group(1))
     raise LookupError(
@@ -194,13 +185,17 @@ def _goyong_grade7_rate(ws, anchor_row: int, anchor_col: int) -> float:
     """고용보험료 7등급 요율을 찾아 반환한다.
 
     앵커 열(anchor_col)에서 아래로 '[7등급]'을 포함한 셀을 찾고,
-    해당 행의 첫 번째 숫자 값을 반환한다.
+    앵커 열부터 오른쪽으로 스캔하여 첫 번째 숫자 값을 반환한다.
+
+    요율 셀은 앵커(B열) 오른쪽 AH열 등에 위치하므로,
+    앵커 왼쪽 셀(등급 번호·임계값 등)을 실수로 집어가지 않도록
+    스캔을 anchor_col 이상 열에서만 시작한다.
     """
     for r in range(anchor_row, anchor_row + 30):
         v = ws.cell(r, anchor_col).value
         if isinstance(v, str) and "[7등급]" in v:
-            # 해당 행의 숫자 셀 탐색 (충분한 넓이로 스캔)
-            for c in range(1, anchor_col + 50):
+            # 요율은 앵커(B열)의 오른쪽 열에 있음 — anchor_col부터 우측으로만 탐색
+            for c in range(anchor_col, anchor_col + 50):
                 n = ws.cell(r, c).value
                 if isinstance(n, (int, float)):
                     return float(n)
@@ -273,6 +268,16 @@ def sanan_rate(path: str, target_band: str) -> dict:
     ------
     LookupError
         앵커·헤더·구간·토목공사 행을 찾지 못할 때.
+
+    Note
+    ----
+    "50억이상" 구간은 파일 내에서 두 개의 sub-band로 분리된다:
+      - 추정금액 800억 미만 (rate ≈ 2.6%)
+      - 추정금액 800억 이상 (rate ≈ 2.73%)
+    현재 구현은 첫 번째 매칭(800억 미만 sub-band)만 반환하므로,
+    800억 이상 공사에 대해서는 반환값이 부정확하다.
+    해당 구간을 구분하려면 target_band를 "50억이상/800억이상" 등으로
+    확장하는 별도 처리가 필요하다.
     """
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = find_data_sheet(wb)
@@ -305,6 +310,7 @@ def sanan_rate(path: str, target_band: str) -> dict:
         raise LookupError("[산업안전보건관리비] 헤더 행(구분/요율)을 찾지 못함")
 
     # 3. 대상액 구간 행 탐색 (anc_col 열에서 정규화 비교)
+    # NOTE: "50억이상"은 800억미만 sub-band만 반환 — 800억 이상 공사는 부정확
     norm_target = _band_norm(target_band)
     band_row = None
     for r in range(hdr_row + 1, anc_row + 60):
@@ -333,7 +339,8 @@ def sanan_rate(path: str, target_band: str) -> dict:
     raw_rate = ws.cell(tomok_row, rate_col).value
     if raw_rate is None:
         raise LookupError(f"산안비 요율 셀 비어 있음 (row={tomok_row}, col={rate_col})")
-    rate = float(raw_rate) / 100.0
+    v = float(raw_rate)
+    rate = v / 100.0 if v > 1 else v
 
     # 6. 기초액 읽기 (천원 → 원 변환)
     base_raw = ws.cell(tomok_row, base_col).value if base_col else None
