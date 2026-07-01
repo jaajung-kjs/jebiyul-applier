@@ -235,7 +235,7 @@ def _iyun_table(path, kind, jikjeop, contract):
 def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
     """적용근거 블록 리스트를 만든다. (Task 2: 표 제외 골격)"""
     b: list = []
-    b.append(Title("8. 공사비 산출 적용근거"))
+    b.append(Title("공사비 산출 적용근거"))
 
     # 1. 간접노무비
     b.append(SectionHeader("1. 간접노무비", NOTE))

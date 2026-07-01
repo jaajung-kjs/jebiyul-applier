@@ -5,7 +5,7 @@ from src import renderer
 
 def _blocks():
     return [
-        M.Title("8. 공사비 산출 적용근거"),
+        M.Title("공사비 산출 적용근거"),
         M.SectionHeader("1. 간접노무비", M.NOTE),
         M.NoteLines(["    ☞ 계상금액 : 직접노무비 × 적용율"]),
         M.AppliedRate("    ☞ 적 용 율 :  ", 0.126, fmt="0.0%"),
@@ -16,7 +16,7 @@ def test_render_writes_title_merged(tmp_path):
     out = str(tmp_path / "o.xlsx")
     renderer.render(_blocks(), out)
     ws = openpyxl.load_workbook(out)["적용근거"]
-    assert ws["A2"].value == "8. 공사비 산출 적용근거"
+    assert ws["A2"].value == "공사비 산출 적용근거"
     assert "A2:J2" in [str(m) for m in ws.merged_cells.ranges]
 
 

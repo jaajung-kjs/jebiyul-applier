@@ -59,7 +59,7 @@ def test_build_output_no_template_dependency(tmp_path, tomok_path):
     out = str(tmp_path / "r.xlsx")
     builder.build_output(rates, out, params=params, jebiyul_path=tomok_path)
     ws = openpyxl.load_workbook(out)["적용근거"]
-    assert ws["A2"].value == "8. 공사비 산출 적용근거"
+    assert ws["A2"].value == "공사비 산출 적용근거"
     texts = [str(v) for v in _all_values(ws) if v]
     assert any("공사규모" in t for t in texts)
     assert any("50억 이상" in t for t in texts)  # 30억 → 압축형 참조행

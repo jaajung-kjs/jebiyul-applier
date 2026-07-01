@@ -38,7 +38,7 @@ def test_skeleton_has_title_and_sections(tmp_path):
     out_path = str(tmp_path / "out.xlsx")
     build_output(SAMPLE_RATES, out_path)
     ws = openpyxl.load_workbook(out_path)["적용근거"]
-    assert ws["A2"].value == "8. 공사비 산출 적용근거"
+    assert ws["A2"].value == "공사비 산출 적용근거"
     texts = _texts(ws)
     assert "1. 간접노무비" in texts
     assert any(str(t).startswith("4. 이") for t in texts if t)
