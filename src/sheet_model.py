@@ -122,21 +122,27 @@ def _ilban_table(path, kind, jikjeop):
     )
 
 
-# ── 기타경비 경비 구성비율 세부표(조달청 표준 구성비, 정적) ─────────────────
-# 좌/우 2쌍(비목·구성비율)으로 배치. PIU 66~70행.
-_GYEONGBI_COMP = [
-    ("수도광열비", 0.20, "여비·교통·통신비", 0.178),
-    ("복리후생비", 0.193, "세금과 공과", 0.123),
-    ("소모품비 및 사무용품비", 0.302, "도서인쇄비", 0.004),
-]
+# ── 기타경비 경비 구성비율(조달청 표준, 제비율 파일엔 값이 없어 정책 고정) ────
+# 단일 출처: 이 dict 하나에서 구성비 세부표와 _ETC_FACTOR가 모두 파생된다.
+_GYEONGBI = {
+    "수도광열비": 0.20, "복리후생비": 0.193, "소모품비 및 사무용품비": 0.302,
+    "여비·교통·통신비": 0.178, "세금과 공과": 0.123, "도서인쇄비": 0.004,
+}
+# 기타경비 적용율 산정에 포함되는 항목(수도광열비·도서인쇄비 제외 — 조달청 기준).
+_ETC_APPLIED_ITEMS = ["복리후생비", "소모품비 및 사무용품비", "여비·교통·통신비", "세금과 공과"]
+_ETC_FACTOR = sum(_GYEONGBI[k] for k in _ETC_APPLIED_ITEMS)
+# 세부표 배치(좌/우 2쌍). PIU 66~70행.
+_GYEONGBI_PAIRS = [("수도광열비", "여비·교통·통신비"),
+                   ("복리후생비", "세금과 공과"),
+                   ("소모품비 및 사무용품비", "도서인쇄비")]
 
 
 def _gyeongbi_comp_table():
     rows = []
-    for lname, lrate, rname, rrate in _GYEONGBI_COMP:
-        rows.append(BandRow([(lname, 3, 5, None), (lrate, 6, 6, "0.0%"),
-                             (rname, 7, 8, None), (rrate, 9, 10, "0.0%")]))
-    rows.append(BandRow([("합계", 3, 8, None), (1.0, 9, 10, "0.0%")]))
+    for lname, rname in _GYEONGBI_PAIRS:
+        rows.append(BandRow([(lname, 3, 5, None), (_GYEONGBI[lname], 6, 6, "0.0%"),
+                             (rname, 7, 8, None), (_GYEONGBI[rname], 9, 10, "0.0%")]))
+    rows.append(BandRow([("합계", 3, 8, None), (round(sum(_GYEONGBI.values()), 3), 9, 10, "0.0%")]))
     return BandTable(
         kind="etc_detail",
         headers=[("비목", 3, 5), ("구성비율", 6, 6), ("비목", 7, 8), ("구성비율", 9, 10)],
@@ -151,8 +157,6 @@ _DURS = [("6개월 이하 (183일)", "183"), ("7-12개월 (365일)", "365"),
 _SIZE_LABEL = {"10억미만": "50억 미만", "10-50억": "50억 미만",
                "50-300억": "50억 ~ 300억 미만", "300-1000억": "300억 ~ 1000억 미만",
                "1000억이상": "1000억 이상"}
-# 기타경비 적용율 = 적용율(기준) × (간접노무비+산경비+일반관리비+이윤 구성비)
-_ETC_FACTOR = (19.3 + 30.2 + 17.8 + 12.3) / 100
 
 
 def _gibon_table(path, item, kind, jikjeop, days):
@@ -197,8 +201,8 @@ def _iyun_comp_band(size):
 
 
 def _suui_iyun_rate(jikjeop):
-    """수의계약 이윤율(조달청 정책): 1000억 미만 10%, 이상 9%."""
-    return 0.09 if jikjeop >= 1e11 else 0.10
+    """수의계약 이윤율(조달청 정책). 값 출처는 lookup의 정책 상수 단일 출처를 재사용."""
+    return lookup.SUUI_IYUN_OVER_1000 if jikjeop >= 1e11 else lookup.SUUI_IYUN_UNDER_1000
 
 
 def _iyun_table(path, kind, jikjeop, contract):
