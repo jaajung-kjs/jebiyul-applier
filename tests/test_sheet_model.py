@@ -83,15 +83,28 @@ def test_all_tables_use_criterion_block(monkeypatch):
             assert all(c[1] != 7 for c in r.cells), f"{t.kind} 표 행에 G열 셀 잔존"
 
 
-def test_ilban_table_highlights_applicable_size(monkeypatch):
-    _stub_lookup(monkeypatch)
-    params = dict(PARAMS, jikjeop_cost=7_000_000_000)  # 30~100억
+def test_ilban_table_is_file_driven_and_highlights_size(monkeypatch):
+    """일반관리비 표는 파일값(5구간)으로 채우고 해당 규모를 강조한다(하드코딩 아님)."""
+    import src.sheet_model as SM
+    seen = {}
+
+    def fake_table_rate(path, item, kind, size, dur, contract=None):
+        seen[(item, size)] = 0.065 if size == "50-300억" else 0.08
+        return seen[(item, size)]
+
+    monkeypatch.setattr(SM.lookup, "table_rate", fake_table_rate)
+    monkeypatch.setattr(SM.lookup, "sanan_rate",
+                        lambda p, band: {"rate": 0.0315, "기초액": None})
+    params = dict(PARAMS, jikjeop_cost=7_000_000_000)  # 70억 → 50-300억
     blocks = M.build(params, RATES, jebiyul_path="DUMMY")
     t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "ilban"][0]
-    assert len(t.rows) == 4
+    assert len(t.rows) == 5                      # 5개 규모구간
+    assert ("일반관리비", "50-300억") in seen     # 파일에서 읽었다
     hi = [r for r in t.rows if r.highlight]
     assert len(hi) == 1
-    assert any("30억원 이상" in str(c[0]) for c in hi[0].cells)
+    assert any("50억" in str(c[0]) and "300억" in str(c[0]) for c in hi[0].cells)
+    # 강조 행의 적용율이 파일값 0.065
+    assert any(abs(c[0] - 0.065) < 1e-9 for c in hi[0].cells if isinstance(c[0], float))
 
 
 def test_iyun_table_highlights_contract_size_row(monkeypatch):

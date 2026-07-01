@@ -74,8 +74,10 @@ _SANAN_BANDS = [("2천만원 미만", "2천만미만"), ("5억원 미만", "5억
 _SANAN_CRITERION = ("[사급재료비+지입재료비+직접노무비]×적용율 과\n"
                     "[지입재료비+직접노무비]×적용율×1.2 중 적은 것을 적용")
 
-_ILBAN = [("5억원 미만", 0.06), ("5억원 이상 ~ 30억원 미만", 0.055),
-          ("30억원 이상 ~ 100억원 미만", 0.05), ("100억원 이상", 0.045)]
+# 일반관리비: 파일에 규모별로 저장(기간 무관). 표준 5구간을 파일값으로 채운다.
+_ILBAN_BANDS = [("10억미만", "10억 미만"), ("10-50억", "10억 ~ 50억 미만"),
+                ("50-300억", "50억 ~ 300억 미만"), ("300-1000억", "300억 ~ 1000억 미만"),
+                ("1000억이상", "1000억 이상")]
 
 _IYUN_COMP = [("50억원 미만", "10억미만"), ("50억원 이상 ~ 300억원 미만", "50-300억"),
               ("300억원 이상 ~ 1000억원 미만", "300-1000억"), ("1000억원 이상", "1000억이상")]
@@ -102,29 +104,19 @@ def _sanan_table(path, target):
     )
 
 
-def _ilban_table(jikjeop):
-    applied = _ilban_band(jikjeop)
+def _ilban_table(path, kind, jikjeop):
+    applied = P.size_band(jikjeop)
     rows = []
-    for i, (label, rate) in enumerate(_ILBAN):
+    for band, label in _ILBAN_BANDS:
+        rate = lookup.table_rate(path, "일반관리비", kind, band, "183")
         rows.append(BandRow([(label, 2, 3, None), (rate, 4, 6, "0.0%")],
-                            highlight=(i == applied)))
+                            highlight=(band == applied)))
     return BandTable(
         kind="ilban",
-        headers=[("공 사 규 모", 2, 3), ("적용율 (전기, 통신, 소방 전문 적용)", 4, 6),
-                 ("적  용  기  준", 7, 10)],
+        headers=[("공 사 규 모", 2, 3), ("적용율", 4, 6), ("적  용  기  준", 7, 10)],
         rows=rows,
         criterion="[지입재료비+노무비+도급분경비]×적용율",
     )
-
-
-def _ilban_band(jikjeop):
-    if jikjeop < 5e8:
-        return 0
-    if jikjeop < 3e9:
-        return 1
-    if jikjeop < 1e10:
-        return 2
-    return 3
 
 
 # ── 간접노무비/기타경비 구간표(50억 분기로 행 수가 변함) ───────────────────
@@ -292,7 +284,7 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
     # 3. 일반관리비
     b.append(SectionHeader("3. 일반관리비", NOTE))
     if jebiyul_path:
-        b.append(_ilban_table(params["jikjeop_cost"]))
+        b.append(_ilban_table(jebiyul_path, params["kind"], params["jikjeop_cost"]))
     b.append(NoteLines(["    ☞ 공사규모별 적용기준 : 지입재료비 + 노무비 + 도급분경비"]))
     b.append(AppliedRate("    ☞ 적 용 율 :  ", rates["일반관리비"], fmt="0.0%"))
 
