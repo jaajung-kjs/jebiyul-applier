@@ -137,9 +137,10 @@ def _emit_table(ws, block, cur):
     for brow in block.rows:
         r = cur.take(1)
         ws.row_dimensions[r].height = styles.ROW_BODY_H
-        fill = styles.highlight_fill() if brow.highlight else None
         for cell in brow.cells:
             value, c0, c1, fmt, rowspan = _norm_cell(cell)
+            # 강조는 단일 행 셀에만. 세로 병합된 규모/구분 라벨은 강조색 제외.
+            fill = styles.highlight_fill() if (brow.highlight and rowspan == 1) else None
             _put(ws, r, c0, c1, value, fill=fill, align=styles.center(),
                  border=True, fmt=fmt, rowspan=rowspan)
     last = cur.row - 1

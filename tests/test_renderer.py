@@ -47,6 +47,33 @@ def test_applied_rate_value_in_I_with_percent_format(tmp_path):
     assert hit.font.color.rgb == "FFFF0000"
 
 
+def test_highlight_skips_vertically_merged_label(tmp_path):
+    """세로 병합된 규모 라벨 칸은 강조색을 받지 않고, 단일 행 셀만 강조된다."""
+    t = M.BandTable(
+        kind="gibon",
+        headers=[("공사규모", 2, 2), ("적용율", 5, 6)],
+        rows=[
+            M.BandRow([("50억 미만", 2, 2, None, 2), ("183일", 3, 4, None), (0.19, 5, 6, "0.0%")],
+                      highlight=True),
+            M.BandRow([("365일", 3, 4, None), (0.20, 5, 6, "0.0%")]),
+        ],
+        criterion="직접노무비 × 적용율",
+    )
+    out = str(tmp_path / "m.xlsx")
+    renderer.render([t], out)
+    ws = openpyxl.load_workbook(out)["적용근거"]
+    size_cell = None
+    dur_cell = None
+    for row in ws.iter_rows():
+        for c in row:
+            if c.value == "50억 미만":
+                size_cell = c
+            if c.value == "183일":
+                dur_cell = c
+    assert size_cell.fill.patternType != "solid"      # 병합 라벨은 강조 안 됨
+    assert dur_cell.fill.fgColor.rgb == "FFFFF2CC"     # 단일 행 셀은 강조
+
+
 def test_applied_rate_annotation_in_J(tmp_path):
     blocks = [M.AppliedRate("    ☞ 적 용 율 :  (사급재료비 제외시)", 0.0315,
                             fmt="0.000%", annotation="× 1.2")]
