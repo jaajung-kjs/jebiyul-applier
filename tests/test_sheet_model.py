@@ -166,6 +166,25 @@ def test_gibon_under_50_compact_with_reference_row(monkeypatch):
     assert len(hi) == 1
 
 
+def test_gibon_uses_actual_size_band_not_collapsed(monkeypatch):
+    """<50억이라도 표 강조 셀은 실제 규모구간(10-50억) 값을 써 헤드라인과 일치한다."""
+    import src.sheet_model as SM
+
+    def fake_table_rate(path, item, kind, size, dur, contract=None):
+        return {"10억미만": 0.191, "10-50억": 0.189}.get(size, 0.2)
+
+    monkeypatch.setattr(SM.lookup, "table_rate", fake_table_rate)
+    monkeypatch.setattr(SM.lookup, "sanan_rate",
+                        lambda p, band: {"rate": 0.0315, "기초액": None})
+    params = dict(PARAMS, jikjeop_cost=3_000_000_000, days=120)  # 30억 → 10-50억, 183일
+    blocks = M.build(params, RATES, jebiyul_path="DUMMY")
+    t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "gibon"][0]
+    hi = [r for r in t.rows if r.highlight][0]
+    rates_in_row = [c[0] for c in hi.cells if isinstance(c[0], float)]
+    assert any(abs(v - 0.189) < 1e-9 for v in rates_in_row)      # 10-50억 값
+    assert not any(abs(v - 0.191) < 1e-9 for v in rates_in_row)  # 10억미만 아님
+
+
 def test_gibon_over_50_expands_actual_band(monkeypatch):
     params = dict(PARAMS, jikjeop_cost=100_000_000_000, days=400)  # 1000억, 365일
     t = _gibon(monkeypatch, params)[0]

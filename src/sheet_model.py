@@ -160,7 +160,7 @@ def _gibon_table(path, item, kind, jikjeop, days):
     dur_applied = P.duration_band(days)
     is_etc = (item == "기타경비")
     under50 = size in ("10억미만", "10-50억")
-    band = "10억미만" if under50 else size      # <50억은 50억미만 스케줄
+    band = size                                 # 항상 실제 규모구간 값 사용(헤드라인과 일치)
     rows = []
     for i, (dlabel, dur) in enumerate(_DURS):
         rate = lookup.table_rate(path, item, kind, band, dur)
