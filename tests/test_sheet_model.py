@@ -77,7 +77,8 @@ def test_all_tables_use_criterion_block(monkeypatch):
     """모든 구간표가 적용기준을 세로 병합 한 칸(criterion)으로 통일해 그린다."""
     _stub_lookup(monkeypatch)
     blocks = M.build(dict(PARAMS, jikjeop_cost=3_000_000_000), RATES, jebiyul_path="DUMMY")
-    for t in [b for b in blocks if isinstance(b, M.BandTable)]:
+    # 적용기준 컬럼을 갖는 구간표만 검사(etc_detail 구성비표는 적용기준 컬럼이 없음)
+    for t in [b for b in blocks if isinstance(b, M.BandTable) and b.kind != "etc_detail"]:
         assert t.criterion, f"{t.kind} 표에 criterion 블록이 없음"
         for r in t.rows:
             assert all(c[1] != 7 for c in r.cells), f"{t.kind} 표 행에 G열 셀 잔존"
@@ -116,6 +117,18 @@ def test_iyun_table_highlights_contract_size_row(monkeypatch):
     hi = [r for r in rows if r.highlight]
     assert len(hi) == 1
     assert any("50억원 이상" in str(c[0]) for c in hi[0].cells)
+
+
+def test_etc_composition_table_present(monkeypatch):
+    """기타경비 경비 구성비율 세부표(수도광열비·도서인쇄비·합계)가 포함된다."""
+    _stub_lookup(monkeypatch)
+    blocks = M.build(dict(PARAMS, jikjeop_cost=3_000_000_000), RATES, jebiyul_path="DUMMY")
+    detail = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "etc_detail"]
+    assert detail, "경비 구성비율 세부표가 없음"
+    texts = [str(c[0]) for r in detail[0].rows for c in r.cells]
+    assert "수도광열비" in texts
+    assert "도서인쇄비" in texts
+    assert "합계" in texts
 
 
 def _gibon(monkeypatch, params):

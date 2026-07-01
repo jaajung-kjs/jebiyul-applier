@@ -119,6 +119,28 @@ def _ilban_table(path, kind, jikjeop):
     )
 
 
+# ── 기타경비 경비 구성비율 세부표(조달청 표준 구성비, 정적) ─────────────────
+# 좌/우 2쌍(비목·구성비율)으로 배치. PIU 66~70행.
+_GYEONGBI_COMP = [
+    ("수도광열비", 0.20, "여비·교통·통신비", 0.178),
+    ("복리후생비", 0.193, "세금과 공과", 0.123),
+    ("소모품비 및 사무용품비", 0.302, "도서인쇄비", 0.004),
+]
+
+
+def _gyeongbi_comp_table():
+    rows = []
+    for lname, lrate, rname, rrate in _GYEONGBI_COMP:
+        rows.append(BandRow([(lname, 3, 5, None), (lrate, 6, 6, "0.0%"),
+                             (rname, 7, 8, None), (rrate, 9, 10, "0.0%")]))
+    rows.append(BandRow([("합계", 3, 8, None), (1.0, 9, 10, "0.0%")]))
+    return BandTable(
+        kind="etc_detail",
+        headers=[("비목", 3, 5), ("구성비율", 6, 6), ("비목", 7, 8), ("구성비율", 9, 10)],
+        rows=rows,
+    )
+
+
 # ── 간접노무비/기타경비 구간표(50억 분기로 행 수가 변함) ───────────────────
 
 _DURS = [("6개월 이하 (183일)", "183"), ("7-12개월 (365일)", "365"),
@@ -275,6 +297,7 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
     if jebiyul_path:
         b.append(_gibon_table(jebiyul_path, "기타경비", params["kind"],
                               params["jikjeop_cost"], params["days"]))
+        b.append(_gyeongbi_comp_table())
     b.append(NoteLines([
         "    ☞ 공사규모별 적용기준 : 도급재료비 + 노무비 + 경비",
         "    ☞ 계상금액 : (도급재료비 + 노무비) × 적용율",
