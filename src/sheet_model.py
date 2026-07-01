@@ -248,7 +248,7 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
     b.append(SectionHeader("2. 경    비"))
     # 가. 공구손료
     b.append(SubHeader(" 가. 공구손료"))
-    b.append(NoteLines(["    ☞ 계상금액 : 직접노무비 × 3%"]))
+    b.append(NoteLines([f"    ☞ 계상금액 : 직접노무비 × {pct(rates['공구손료'])}%"]))
     b.append(AppliedRate("    ☞ 적 용 율 :  ", rates["공구손료"], fmt="0.0%"))
     # 나. 산재
     b.append(SubHeader(" 나. 산업재해보상보험료"))
