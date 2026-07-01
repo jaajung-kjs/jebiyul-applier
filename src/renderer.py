@@ -63,10 +63,10 @@ def _emit_title(ws, block, cur):
     c.value = block.text
     c.font = styles.title_font()
     c.alignment = styles.center()
-    cur.take(1)  # 섹션 사이 여백 한 줄
 
 
 def _emit_section(ws, block, cur):
+    cur.take(1)  # 대분류(1·2·3·4) 앞 빈 행 하나(가독성)
     r = cur.take(1)
     ws.row_dimensions[r].height = styles.ROW_BODY_H
     c = ws[f"A{r}"]
