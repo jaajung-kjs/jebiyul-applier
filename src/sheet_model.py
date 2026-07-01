@@ -70,9 +70,9 @@ def pct(rate: float) -> str:
 
 _SANAN_BANDS = [("2천만원 미만", "2천만미만"), ("5억원 미만", "5억미만"),
                 ("5 - 50억원 미만", "5-50억"), ("50억원 이상", "50억이상")]
-_SANAN_CRIT = ["[사급재료비+지입재료비+직접노무비]×",
-               "적용율과   [지입재료비+직접노무비]×",
-               "적용율 × 1.2 중 적은것을 적용한다", ""]
+# 적용기준: 다른 표와 동일하게 세로 병합 한 칸으로 설명(PIU는 3행에 쪼개 넣었으나 통일).
+_SANAN_CRITERION = ("[사급재료비+지입재료비+직접노무비]×적용율 과\n"
+                    "[지입재료비+직접노무비]×적용율×1.2 중 적은 것을 적용")
 
 _ILBAN = [("5억원 미만", 0.06), ("5억원 이상 ~ 30억원 미만", 0.055),
           ("30억원 이상 ~ 100억원 미만", 0.05), ("100억원 이상", 0.045)]
@@ -85,19 +85,20 @@ _IYUN_SUUI = [("1000억원 미만", "50-300억"), ("1000억원 이상", "1000억
 def _sanan_table(path, target):
     applied = P.sanan_band(target)
     rows = []
-    for (label, band), crit in zip(_SANAN_BANDS, _SANAN_CRIT):
+    for label, band in _SANAN_BANDS:
         info = lookup.sanan_rate(path, band)
         if info.get("기초액"):
             cell_rate = (f"{pct(info['rate'])}%+{info['기초액'] / 1000:,.0f}천원", 4, 6, None)
         else:
             cell_rate = (info["rate"], 4, 6, "0.00%")
-        rows.append(BandRow([(label, 2, 3, None), cell_rate, (crit, 7, 10, None)],
+        rows.append(BandRow([(label, 2, 3, None), cell_rate],
                             highlight=(band == applied)))
     return BandTable(
         kind="sanan",
         headers=[("공사규모(대상액)별", 2, 3), ("적    용    율[특수 및 기타 적용]", 4, 6),
                  ("적  용  기  준", 7, 10)],
         rows=rows,
+        criterion=_SANAN_CRITERION,
     )
 
 

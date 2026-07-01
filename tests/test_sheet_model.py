@@ -62,6 +62,27 @@ def test_sanan_table_four_bands_highlight_applicable(monkeypatch):
     assert any("5억원 미만" in str(c[0]) for c in hi[0].cells)
 
 
+def test_sanan_criterion_is_single_merged_block(monkeypatch):
+    """산안비 적용기준은 다른 표처럼 세로 병합 한 칸으로 설명한다(행별 분할 금지)."""
+    _stub_lookup(monkeypatch)
+    blocks = M.build(dict(PARAMS, sanan_target=300_000_000), RATES, jebiyul_path="DUMMY")
+    t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "sanan"][0]
+    assert t.criterion  # 세로 병합 블록으로 설명
+    # 데이터 행에는 적용기준(G열=7) 셀이 없어야 한다(규모/율 2칸만)
+    for r in t.rows:
+        assert all(c[1] != 7 for c in r.cells), "행별 G열 적용기준 셀이 남아있음"
+
+
+def test_all_tables_use_criterion_block(monkeypatch):
+    """모든 구간표가 적용기준을 세로 병합 한 칸(criterion)으로 통일해 그린다."""
+    _stub_lookup(monkeypatch)
+    blocks = M.build(dict(PARAMS, jikjeop_cost=3_000_000_000), RATES, jebiyul_path="DUMMY")
+    for t in [b for b in blocks if isinstance(b, M.BandTable)]:
+        assert t.criterion, f"{t.kind} 표에 criterion 블록이 없음"
+        for r in t.rows:
+            assert all(c[1] != 7 for c in r.cells), f"{t.kind} 표 행에 G열 셀 잔존"
+
+
 def test_ilban_table_highlights_applicable_size(monkeypatch):
     _stub_lookup(monkeypatch)
     params = dict(PARAMS, jikjeop_cost=7_000_000_000)  # 30~100억
