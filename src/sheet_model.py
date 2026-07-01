@@ -307,9 +307,12 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
         "    ☞ 계상금액 : [지입재료비+직접노무비] × 적용율 × 1.2 와",
         "                    [사급재료비+지입재료비+직접노무비] × 적용율 중 적은 금액",
     ]))
-    b.append(AppliedRate("    ☞ 적 용 율 :  (사급재료비 제외시)", rates["산업안전보건관리비"],
-                         fmt="0.000%", annotation="× 1.2"))
-    b.append(AppliedRate("    ☞ 적 용 율 :  (사급재료비 포함시)", rates["산업안전보건관리비"], fmt="0.000%"))
+    # 대상액 2천만원 미만이면 적용제외(율 0) — 헤드라인도 표와 동일하게 '적용제외' 표기.
+    sanan_val = rates["산업안전보건관리비"]
+    sanan_disp = "적용제외" if not sanan_val else sanan_val
+    b.append(AppliedRate("    ☞ 적 용 율 :  (사급재료비 제외시)", sanan_disp,
+                         fmt="0.000%", annotation="" if not sanan_val else "× 1.2"))
+    b.append(AppliedRate("    ☞ 적 용 율 :  (사급재료비 포함시)", sanan_disp, fmt="0.000%"))
     # 자. 기타경비
     b.append(SubHeader(" 자. 기타 경비"))
     if jebiyul_path:

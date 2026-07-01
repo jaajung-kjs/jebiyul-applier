@@ -108,7 +108,8 @@ def _emit_applied(ws, block, cur):
     lab.alignment = styles.left()
     val = ws[f"I{r}"]
     val.value = block.value
-    val.number_format = block.fmt
+    if isinstance(block.value, (int, float)):
+        val.number_format = block.fmt   # 숫자일 때만 % 서식(문자 '적용제외'엔 미적용)
     val.font = styles.rate_font()
     val.alignment = styles.right()
     if block.annotation:

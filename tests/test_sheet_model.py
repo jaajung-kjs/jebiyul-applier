@@ -79,6 +79,25 @@ def test_sanan_2천만미만_shows_적용제외(monkeypatch):
     assert all(c[0] != 0 for c in first.cells)   # 0 값이 남지 않음
 
 
+def test_sanan_headline_shows_적용제외_when_rate_zero():
+    """대상액 2천만 미만(율 0)이면 산안비 헤드라인도 '적용제외'로 표기(표와 일치)."""
+    rates = dict(RATES, 산업안전보건관리비=0.0)
+    blocks = M.build(dict(PARAMS, sanan_target=1_000_000), rates)
+    sanan_hl = [b for b in blocks if isinstance(b, M.AppliedRate) and "사급재료비" in b.label]
+    assert sanan_hl and all(b.value == "적용제외" for b in sanan_hl)
+    # 적용제외면 × 1.2 표기도 없음
+    assert all(not b.annotation for b in sanan_hl)
+
+
+def test_sanan_headline_shows_rate_when_applicable():
+    """율이 있으면 헤드라인은 숫자값 + × 1.2(제외시)."""
+    rates = dict(RATES, 산업안전보건관리비=0.0315)
+    blocks = M.build(dict(PARAMS, sanan_target=300_000_000), rates)
+    sanan_hl = [b for b in blocks if isinstance(b, M.AppliedRate) and "사급재료비" in b.label]
+    assert all(b.value == 0.0315 for b in sanan_hl)
+    assert any(b.annotation == "× 1.2" for b in sanan_hl)
+
+
 def test_sanan_criterion_is_single_merged_block(monkeypatch):
     """산안비 적용기준은 다른 표처럼 세로 병합 한 칸으로 설명한다(행별 분할 금지)."""
     _stub_lookup(monkeypatch)
