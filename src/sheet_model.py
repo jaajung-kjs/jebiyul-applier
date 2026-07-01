@@ -37,6 +37,7 @@ class AppliedRate:
     label: str
     value: float
     fmt: str = "0.0%"
+    annotation: str = ""   # 값 오른쪽(J열)에 붙는 표기(예: 산안비 사급 제외시 '× 1.2')
 
 
 @dataclass
@@ -290,7 +291,8 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
         "    ☞ 계상금액 : [지입재료비+직접노무비] × 적용율 × 1.2 와",
         "                    [사급재료비+지입재료비+직접노무비] × 적용율 중 적은 금액",
     ]))
-    b.append(AppliedRate("    ☞ 적 용 율 :  (사급재료비 제외시)", rates["산업안전보건관리비"], fmt="0.000%"))
+    b.append(AppliedRate("    ☞ 적 용 율 :  (사급재료비 제외시)", rates["산업안전보건관리비"],
+                         fmt="0.000%", annotation="× 1.2"))
     b.append(AppliedRate("    ☞ 적 용 율 :  (사급재료비 포함시)", rates["산업안전보건관리비"], fmt="0.000%"))
     # 자. 기타경비
     b.append(SubHeader(" 자. 기타 경비"))

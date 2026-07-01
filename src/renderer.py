@@ -111,6 +111,11 @@ def _emit_applied(ws, block, cur):
     val.number_format = block.fmt
     val.font = styles.rate_font()
     val.alignment = styles.right()
+    if block.annotation:
+        ann = ws[f"J{r}"]
+        ann.value = block.annotation
+        ann.font = styles.rate_font()
+        ann.alignment = styles.left()
 
 
 def _emit_table(ws, block, cur):

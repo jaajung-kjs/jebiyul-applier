@@ -47,6 +47,15 @@ def test_applied_rate_value_in_I_with_percent_format(tmp_path):
     assert hit.font.color.rgb == "FFFF0000"
 
 
+def test_applied_rate_annotation_in_J(tmp_path):
+    blocks = [M.AppliedRate("    ☞ 적 용 율 :  (사급재료비 제외시)", 0.0315,
+                            fmt="0.000%", annotation="× 1.2")]
+    out = str(tmp_path / "a.xlsx")
+    renderer.render(blocks, out)
+    ws = openpyxl.load_workbook(out)["적용근거"]
+    assert any(c.value == "× 1.2" for c in ws["J"])
+
+
 def test_column_widths_applied(tmp_path):
     out = str(tmp_path / "o.xlsx")
     renderer.render(_blocks(), out)
