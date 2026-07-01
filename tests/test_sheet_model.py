@@ -136,6 +136,39 @@ def test_iyun_table_highlights_contract_size_row(monkeypatch):
     assert any("50억원 이상" in str(c[0]) for c in hi[0].cells)
 
 
+def test_iyun_highlights_10_50억_as_50억미만_row(monkeypatch):
+    """10~50억 규모(경쟁)도 이윤 '50억원 미만' 행에 강조가 잡힌다(밴드 매핑 버그 회귀)."""
+    _stub_lookup(monkeypatch)
+    params = dict(PARAMS, contract="경쟁", jikjeop_cost=3_000_000_000)  # 30억 → 10-50억
+    blocks = M.build(params, RATES, jebiyul_path="DUMMY")
+    t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "iyun"][0]
+    hi = [r for r in t.rows if r.highlight]
+    assert len(hi) == 1
+    assert any("50억원 미만" in str(c[0]) for c in hi[0].cells)
+
+
+def test_etc_headline_is_applied_rate_not_base(monkeypatch):
+    """기타경비 헤드라인 적용율 = 기준 × 구성비(F열), 기준(E열)이 아님."""
+    _stub_lookup(monkeypatch)  # table_rate → 0.12 (기준)
+    blocks = M.build(dict(PARAMS, jikjeop_cost=3_000_000_000, days=120),
+                     dict(RATES, 기타경비=0.12), jebiyul_path="DUMMY")
+    applied = [b for b in blocks if isinstance(b, M.AppliedRate)]
+    # 기타경비 적용율 = round(0.12 * _ETC_FACTOR, 3)
+    expected = round(0.12 * M._ETC_FACTOR, 3)
+    assert any(abs(a.value - expected) < 1e-9 for a in applied)
+    assert not any(abs(a.value - 0.12) < 1e-9 for a in applied)  # 기준값 아님
+
+
+def test_iyun_suui_headline_uses_policy_rate():
+    """이윤 수의 헤드라인은 경쟁값이 아니라 수의 정책값(1000억미만 10%)."""
+    blocks = M.build(dict(PARAMS, jikjeop_cost=3_000_000_000), dict(RATES, 이윤=0.15))
+    suui = [b for b in blocks if isinstance(b, M.AppliedRate) and "수의" in b.label]
+    assert suui and abs(suui[0].value - 0.10) < 1e-9
+    over = M.build(dict(PARAMS, jikjeop_cost=200_000_000_000), dict(RATES, 이윤=0.09))
+    suui2 = [b for b in over if isinstance(b, M.AppliedRate) and "수의" in b.label]
+    assert abs(suui2[0].value - 0.09) < 1e-9
+
+
 def test_etc_composition_table_present(monkeypatch):
     """기타경비 경비 구성비율 세부표(수도광열비·도서인쇄비·합계)가 포함된다."""
     _stub_lookup(monkeypatch)

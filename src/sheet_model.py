@@ -191,8 +191,18 @@ def _gibon_table(path, item, kind, jikjeop, days):
                      criterion=criterion, subheaders=subheaders)
 
 
+def _iyun_comp_band(size):
+    """size_band → 이윤 경쟁 표의 규모 밴드('50억원 미만' 행은 10억미만/10-50억을 함께 포함)."""
+    return "10억미만" if size in ("10억미만", "10-50억") else size
+
+
+def _suui_iyun_rate(jikjeop):
+    """수의계약 이윤율(조달청 정책): 1000억 미만 10%, 이상 9%."""
+    return 0.09 if jikjeop >= 1e11 else 0.10
+
+
 def _iyun_table(path, kind, jikjeop, contract):
-    comp_applied = P.size_band(jikjeop)
+    comp_applied = _iyun_comp_band(P.size_band(jikjeop))
     suui_applied = "1000억이상" if jikjeop >= 1e11 else "50-300억"
     rows = []
     for i, (label, band) in enumerate(_IYUN_COMP):
@@ -306,7 +316,8 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
         "    ☞ 공사규모별 적용기준 : 도급재료비 + 노무비 + 경비",
         "    ☞ 계상금액 : (도급재료비 + 노무비) × 적용율",
     ]))
-    b.append(AppliedRate("    ☞ 적 용 율 :  ", rates["기타경비"], fmt="0.0%"))
+    # 기타경비 적용율 = 기준 × 경비구성비 합(_ETC_FACTOR), 표 F열과 동일.
+    b.append(AppliedRate("    ☞ 적 용 율 :  ", round(rates["기타경비"] * _ETC_FACTOR, 3), fmt="0.0%"))
 
     # 3. 일반관리비
     b.append(SectionHeader("3. 일반관리비", NOTE))
@@ -321,6 +332,6 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
         b.append(_iyun_table(jebiyul_path, params["kind"], params["jikjeop_cost"], params["contract"]))
     b.append(NoteLines(["    ☞ 공사규모별 적용기준 : 지입재료비 + 노무비 + 도급분경비"]))
     b.append(AppliedRate("    ☞ 적 용 율 :  (일반)", rates["이윤"], fmt="0.00%"))
-    b.append(AppliedRate("    ☞ 적 용 율 :  (수의)", rates["이윤"], fmt="0.00%"))
+    b.append(AppliedRate("    ☞ 적 용 율 :  (수의)", _suui_iyun_rate(params["jikjeop_cost"]), fmt="0.00%"))
 
     return b
