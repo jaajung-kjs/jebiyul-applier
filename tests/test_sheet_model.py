@@ -62,6 +62,23 @@ def test_sanan_table_four_bands_highlight_applicable(monkeypatch):
     assert any("5억원 미만" in str(c[0]) for c in hi[0].cells)
 
 
+def test_sanan_2천만미만_shows_적용제외(monkeypatch):
+    """2천만원 미만 구간은 0.00% 대신 '적용제외'로 표기한다."""
+    import src.sheet_model as SM
+
+    def fake_sanan(path, band):
+        return {"rate": 0.0, "기초액": None} if band == "2천만미만" \
+            else {"rate": 0.0315, "기초액": None}
+
+    monkeypatch.setattr(SM.lookup, "sanan_rate", fake_sanan)
+    monkeypatch.setattr(SM.lookup, "table_rate", lambda *a, **k: 0.12)
+    blocks = M.build(dict(PARAMS, sanan_target=300_000_000), RATES, jebiyul_path="DUMMY")
+    t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "sanan"][0]
+    first = t.rows[0]  # 2천만원 미만
+    assert any("적용제외" in str(c[0]) for c in first.cells)
+    assert all(c[0] != 0 for c in first.cells)   # 0 값이 남지 않음
+
+
 def test_sanan_criterion_is_single_merged_block(monkeypatch):
     """산안비 적용기준은 다른 표처럼 세로 병합 한 칸으로 설명한다(행별 분할 금지)."""
     _stub_lookup(monkeypatch)

@@ -92,6 +92,8 @@ def _sanan_table(path, target):
         info = lookup.sanan_rate(path, band)
         if info.get("기초액"):
             cell_rate = (f"{pct(info['rate'])}%+{info['기초액'] / 1000:,.0f}천원", 4, 6, None)
+        elif not info["rate"]:
+            cell_rate = ("적용제외", 4, 6, None)   # 2천만원 미만 = 산안비 대상 아님
         else:
             cell_rate = (info["rate"], 4, 6, "0.00%")
         rows.append(BandRow([(label, 2, 3, None), cell_rate],
