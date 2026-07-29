@@ -204,7 +204,9 @@ def _put(ws, row, c0, c1, value, fill=None, align=None, border=False, fmt=None, 
                 ws.cell(rr, col).border = b
 
 
-_NOMU_C0 = 4  # 과거열 시작(D)
+_NOMU_NAME = 1  # 직종명(A)
+_NOMU_CODE = 2  # No.=직종코드(B)
+_NOMU_C0 = 3    # 과거열 시작(C)
 
 
 def _nomu_cols(p):
@@ -248,9 +250,8 @@ def _emit_nomu_header(ws, block, cur):
         _put(ws, row, c0, c1, text, fill=fill or styles.header_fill(),
              align=styles.center(wrap=True), border=True, rowspan=rowspan)
 
-    hdr(r1, 1, 1, "번호", rowspan=2)
-    hdr(r1, 2, 2, "직  종  명", rowspan=2)
-    hdr(r1, 3, 3, "No.", rowspan=2)
+    hdr(r1, _NOMU_NAME, _NOMU_NAME, "직  종  명", rowspan=2)
+    hdr(r1, _NOMU_CODE, _NOMU_CODE, "No.", rowspan=2)
     hdr(r1, past0, past0 + p - 1, "공 표 일")
     # 실제 적용되는 현재 시점 열은 강조색으로 구분
     hdr(r1, cur_c, cur_c, block.current_col, rowspan=2, fill=styles.highlight_fill())
@@ -266,9 +267,9 @@ def _emit_nomu_group(ws, block, cur):
     past0, cur_c, delta_c, note_c = _nomu_cols(block.past_count)
     _nomu_grid(ws, r, note_c)
     ws.cell(r, cur_c).fill = styles.highlight_fill()   # 현재 적용열 강조(연속 띠)
-    _put(ws, r, 2, 2, f"{block.roman}. {block.name}",
+    _put(ws, r, _NOMU_NAME, _NOMU_NAME, f"{block.roman}. {block.name}",
          align=styles.left(), border=True)
-    ws.cell(r, 2).font = styles.bold_font()
+    ws.cell(r, _NOMU_NAME).font = styles.bold_font()
     # 새 그룹 시작 — 평균 계산식이 참조할 데이터 행 범위 초기화
     cur.grp_first = None
     cur.grp_last = None
@@ -282,9 +283,9 @@ def _emit_nomu_row(ws, block, cur):
     if getattr(cur, "grp_first", None) is None:
         cur.grp_first = r
     cur.grp_last = r
-    _put(ws, r, 1, 1, block.no, align=styles.center(), border=True)
-    _put(ws, r, 2, 2, block.name, align=styles.left(), border=True)
-    _put(ws, r, 3, 3, int(block.code), align=styles.center(), border=True)
+    _put(ws, r, _NOMU_NAME, _NOMU_NAME, block.name, align=styles.left(), border=True)
+    _put(ws, r, _NOMU_CODE, _NOMU_CODE, int(block.code),
+         align=styles.center(), border=True)
     for j, w in enumerate(block.past_wages):
         _put(ws, r, past0 + j, past0 + j, w, align=styles.right(),
              border=True, fmt=styles.COMMA_FMT)
@@ -306,7 +307,8 @@ def _emit_nomu_avg(ws, block, cur):
     ws.row_dimensions[r].height = styles.ROW_BODY_H
     _nomu_grid(ws, r, note_c)
     ws.cell(r, cur_c).fill = styles.highlight_fill()   # 현재 적용열 강조(연속 띠)
-    _put(ws, r, 2, 2, "노임변동률평균", align=styles.center(), border=True)
+    _put(ws, r, _NOMU_NAME, _NOMU_NAME, "노임변동률평균",
+         align=styles.center(), border=True)
     # 그룹 변동율 셀 범위의 평균 → 엑셀 계산식(빈 셀은 AVERAGE가 자동 제외)
     first = getattr(cur, "grp_first", None)
     last = getattr(cur, "grp_last", None)

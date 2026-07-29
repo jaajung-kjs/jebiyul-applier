@@ -130,7 +130,7 @@ def _nomu_ws(N, renderer, styles):
     blocks = [
         N.NomuHeader(["2024.9.1", "2025.1.1", "2025.9.1"], "2026.1.1"),
         N.NomuGroup("Ⅰ", "일반공사직종"),
-        N.NomuRow(75, "보통인부", "1002", [167081, 169804, 171037], 172068, 0.006028, ""),
+        N.NomuRow("보통인부", "1002", [167081, 169804, 171037], 172068, 0.006028, ""),
         N.NomuAvg(0.006028),
     ]
     wb = __import__("openpyxl").Workbook()
@@ -161,14 +161,14 @@ def test_nomu_render_row_and_formulas(tmp_path):
     cur = next(c for row in ws.iter_rows() for c in row if c.value == 172068)
     assert cur.number_format == "#,##0"
     r = cur.row  # 보통인부 데이터 행
-    # 변동율은 하드코딩 값이 아니라 계산식: =(현재-직전)/직전
-    delta = ws.cell(r, 8)   # H열(과거3 → 변동율)
-    assert delta.value == "=(G%d-F%d)/F%d" % (r, r, r)
+    # 변동율은 하드코딩 값이 아니라 계산식: =(현재-직전)/직전 (현재=F, 직전=E)
+    delta = ws.cell(r, 7)   # G열(직종명·No.·과거3 → 현재F → 변동율G)
+    assert delta.value == "=(F%d-E%d)/E%d" % (r, r, r)
     assert delta.number_format == "0.0%"
     # 노임변동률평균도 계산식(AVERAGE)
     avg_r = next(c.row for row in ws.iter_rows() for c in row if c.value == "노임변동률평균")
-    avg = ws.cell(avg_r, 8)
-    assert avg.value == "=AVERAGE(H%d:H%d)" % (r, r)
+    avg = ws.cell(avg_r, 7)
+    assert avg.value == "=AVERAGE(G%d:G%d)" % (r, r)
     assert avg.number_format == "0.0%"
 
 
@@ -203,7 +203,7 @@ def test_nomu_all_cells_have_full_borders(tmp_path):
         return all(getattr(b, k) is not None and getattr(b, k).style
                    for k in ("top", "bottom", "left", "right"))
 
-    note_c = 9  # 과거 3열 → 비고 = I열
+    note_c = 8  # 직종명·No.·과거3·현재·변동율·비고 = H열
     for label in ("Ⅰ. 일반공사직종", "노임변동률평균", "보통인부"):
         r = next(c.row for row in ws.iter_rows() for c in row if c.value == label)
         for col in range(1, note_c + 1):

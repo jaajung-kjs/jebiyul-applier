@@ -40,7 +40,6 @@ class NomuGroup:
 
 @dataclass(frozen=True)
 class NomuRow:
-    no: int
     name: str
     code: str
     past_wages: list
@@ -91,7 +90,7 @@ def build(report, selected):
             d = _delta(r)
             deltas.append(d)
             blocks.append(NomuRow(
-                no=r.seq, name=r.name, code=r.code,
+                name=r.name, code=r.code,
                 past_wages=list(reversed(r.wages[1:])),
                 current_wage=r.wages[0], delta=d, note=r.marker,
             ))
