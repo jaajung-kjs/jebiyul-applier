@@ -35,6 +35,7 @@ class NomuHeader:
 class NomuGroup:
     roman: str
     name: str
+    past_count: int = 3
 
 
 @dataclass(frozen=True)
@@ -83,7 +84,7 @@ def build(report, selected):
         members = sorted((r for r in picked if r.bumun == bumun), key=lambda r: r.code)
         if not members:
             continue
-        blocks.append(NomuGroup(_ROMAN[gi], f"{bumun}직종"))
+        blocks.append(NomuGroup(_ROMAN[gi], f"{bumun}직종", past_count=p))
         gi += 1
         deltas = []
         for r in members:

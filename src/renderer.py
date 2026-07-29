@@ -213,6 +213,17 @@ def _nomu_cols(p):
     return _NOMU_C0, cur_c, cur_c + 1, cur_c + 2
 
 
+def _nomu_hframe(ws, r, last_col):
+    """행 1..last_col 전체에 가로 테두리 + 좌/우 외곽선을 깐다.
+
+    내용 있는 셀은 이후 _put(box_border)로 덮어써 세로 구분선까지 갖고, 빈 칸은
+    가로·외곽선만 남아 표 테두리가 끊기지 않는다.
+    """
+    for col in range(1, last_col + 1):
+        ws.cell(r, col).border = styles.hframe_border(
+            left=(col == 1), right=(col == last_col))
+
+
 def _emit_nomu_title(ws, block, cur):
     r = cur.take(1)
     ws.row_dimensions[r].height = styles.ROW_TITLE_H
@@ -250,10 +261,11 @@ def _emit_nomu_header(ws, block, cur):
 def _emit_nomu_group(ws, block, cur):
     r = cur.take(1)
     ws.row_dimensions[r].height = styles.ROW_BODY_H
-    c = ws.cell(r, 2)
-    c.value = f"{block.roman}. {block.name}"
-    c.font = styles.bold_font()
-    c.alignment = styles.left()
+    last_col = _nomu_cols(block.past_count)[-1]
+    _nomu_hframe(ws, r, last_col)
+    _put(ws, r, 2, 2, f"{block.roman}. {block.name}",
+         align=styles.left(), border=True)
+    ws.cell(r, 2).font = styles.bold_font()
 
 
 def _emit_nomu_row(ws, block, cur):
@@ -278,6 +290,7 @@ def _emit_nomu_avg(ws, block, cur):
     past0, cur_c, delta_c, note_c = _nomu_cols(block.past_count)
     r = cur.take(1)
     ws.row_dimensions[r].height = styles.ROW_BODY_H
+    _nomu_hframe(ws, r, note_c)
     _put(ws, r, 2, 2, "노임변동률평균", align=styles.center(), border=True)
     _put(ws, r, delta_c, delta_c, block.value, align=styles.center(),
          border=True, fmt=styles.PCT_FMT)

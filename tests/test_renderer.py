@@ -150,3 +150,34 @@ def test_nomu_render_row_and_avg(tmp_path):
     d = next(c for row in ws.iter_rows() for c in row
              if isinstance(c.value, float) and abs(c.value - 0.006028) < 1e-6)
     assert d.number_format == "0.0%"
+
+
+def test_nomu_group_and_avg_rows_have_continuous_borders(tmp_path):
+    """그룹 헤더·평균 행도 가로 테두리와 좌/우 외곽선이 이어진다(빈 칸 세로선은 생략)."""
+    from src import renderer, styles, nomu_model as N
+    blocks = [
+        N.NomuHeader(["2024.9.1", "2025.1.1", "2025.9.1"], "2026.1.1"),
+        N.NomuGroup("Ⅰ", "일반공사직종"),
+        N.NomuRow(75, "보통인부", "1002", [167081, 169804, 171037], 172068, 0.006028, ""),
+        N.NomuAvg(0.006028),
+    ]
+    wb = __import__("openpyxl").Workbook()
+    ws = wb.active
+    renderer.render_sheet(ws, blocks, styles.NOMU_COL_WIDTHS)
+
+    def has(side):
+        return side is not None and side.style
+
+    note_c = 9  # 과거 3열 → 비고 = I열
+    for label in ("Ⅰ. 일반공사직종", "노임변동률평균"):
+        r = next(c.row for row in ws.iter_rows() for c in row if c.value == label)
+        # 행 전체에 가로(위/아래) 테두리가 이어진다
+        for col in range(1, note_c + 1):
+            b = ws.cell(r, col).border
+            assert has(b.top) and has(b.bottom), f"{label} r{r} c{col} 가로 테두리 끊김"
+        # 좌/우 표 가장자리가 있다
+        assert has(ws.cell(r, 1).border.left), f"{label} 좌측 외곽선 없음"
+        assert has(ws.cell(r, note_c).border.right), f"{label} 우측 외곽선 없음"
+        # 내용 없는 중간 칸(C=3)은 세로 구분선이 없다(자연스러움)
+        empty = ws.cell(r, 3).border
+        assert not has(empty.left) and not has(empty.right), f"{label} 빈 칸 세로선 존재"
