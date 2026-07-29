@@ -7,3 +7,6 @@ __pycache__/
 build/
 dist/
 *.spec.bak
+
+# 임금실태조사 등 입력 hwp(대용량/입력 파일)
+*.hwp
