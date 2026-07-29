@@ -150,6 +150,18 @@ def test_nomu_title_matches_apply_sheet_style(tmp_path):
     assert c.font.size == 24
 
 
+def test_nomu_footnote_renders_left_no_border(tmp_path):
+    from src import renderer, styles, nomu_model as N
+    wb = __import__("openpyxl").Workbook()
+    ws = wb.active
+    renderer.render_sheet(ws, [N.NomuFootnote(["주)「*」표시 직종은 조사현장수가 5개미만 직종임"])],
+                          styles.NOMU_COL_WIDTHS)
+    c = next(c for row in ws.iter_rows() for c in row
+             if c.value and "5개미만" in str(c.value))
+    assert c.alignment.horizontal == "left"
+    assert c.border.top.style is None  # 각주엔 테두리 없음
+
+
 def test_nomu_render_row_and_formulas(tmp_path):
     from src import renderer, styles, nomu_model as N
     ws = _nomu_ws(N, renderer, styles)

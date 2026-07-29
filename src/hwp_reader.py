@@ -108,6 +108,7 @@ class NomuReport:
     half: str
     order: tuple
     rates: dict
+    marker_notes: dict = None   # {"*": 각주문장, "**": ...} — hwp 원문에서 추출
 
 
 def _row_cells(grid, r):
@@ -183,4 +184,35 @@ def read_hwp(path):
 
     if dates is None or len(rates) < 50:
         raise HwpFormatError(f"노임 데이터 파싱 실패(직종 {len(rates)}개) — 양식 불일치")
-    return NomuReport(dates, _half(dates[0]), tuple(order), rates)
+    marker_notes = _marker_legends(_read_paragraphs(path))
+    return NomuReport(dates, _half(dates[0]), tuple(order), rates, marker_notes)
+
+
+def _read_paragraphs(path):
+    """hwp 본문의 모든 문단 텍스트(표 밖 포함)를 순서대로 반환한다."""
+    ole = olefile.OleFileIO(path)
+    out = []
+    for buf in _section_bytes(ole):
+        for tag, _lvl, p in _records(buf):
+            if tag == _PARA_TEXT:
+                out.append(_clean(p))
+    return out
+
+
+def _marker_legends(paras):
+    """직종번호 마커(*,**) 설명 문장을 hwp 각주에서 그대로 읽어온다.
+
+    기준 문구('5개 미만' 등)를 하드코딩하지 않고 원문을 쓰므로, 보고서가 기준을
+    바꿔도 자동 반영된다. 전용 각주 줄만 고른다:
+    - '*' 줄: 「*」는 있고 「**」는 없는 문단
+    - '**' 줄: 「**」는 있고 「*」는 없는 문단(둘 다 든 통합 안내문은 제외)
+    """
+    notes = {}
+    for t in paras:
+        s = t.strip()
+        has1, has2 = ("「*」" in s), ("「**」" in s)
+        if has2 and not has1 and "**" not in notes:
+            notes["**"] = s
+        elif has1 and not has2 and "*" not in notes:
+            notes["*"] = s
+    return notes

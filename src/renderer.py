@@ -67,6 +67,8 @@ def _emit(ws, block, cur):
         _emit_nomu_row(ws, block, cur)
     elif isinstance(block, NM.NomuAvg):
         _emit_nomu_avg(ws, block, cur)
+    elif isinstance(block, NM.NomuFootnote):
+        _emit_nomu_footnote(ws, block, cur)
     else:
         raise TypeError(f"unknown block: {block!r}")
 
@@ -317,3 +319,15 @@ def _emit_nomu_avg(ws, block, cur):
            if first is not None and block.value is not None else None)
     _put(ws, r, delta_c, delta_c, avg, align=styles.center(),
          border=True, fmt=styles.PCT_FMT)
+
+
+def _emit_nomu_footnote(ws, block, cur):
+    """표 아래 각주(마커 설명). 테두리 없이 왼쪽 정렬."""
+    cur.take(1)  # 표와 각주 사이 여백 한 줄
+    for line in block.lines:
+        r = cur.take(1)
+        ws.row_dimensions[r].height = styles.ROW_BODY_H
+        c = ws.cell(r, _NOMU_NAME)
+        c.value = line
+        c.font = styles.body_font()
+        c.alignment = styles.left()

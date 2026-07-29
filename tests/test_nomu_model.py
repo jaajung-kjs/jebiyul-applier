@@ -34,6 +34,18 @@ def test_build_avg_is_group_mean(hwp_path):
     assert abs(avg.value - sum(r.delta for r in rows) / len(rows)) < 1e-9
 
 
+def test_build_footnote_from_hwp_legend(hwp_path):
+    """* 마커 직종 선택 시, hwp 원문 각주(기준 문구 포함)가 하단에 붙는다."""
+    rep = read_hwp(hwp_path)
+    blocks = N.build(rep, ["보통인부", "인력운반공"])  # 인력운반공 = * (조사현장 5개미만)
+    fns = [b for b in blocks if isinstance(b, N.NomuFootnote)]
+    assert fns, "* 마커 직종 선택 시 각주 블록이 있어야"
+    assert any("5개" in ln for ln in fns[0].lines)  # 기준 문구는 하드코딩 아닌 hwp에서
+    # 마커 없는 직종만 선택하면 각주 없음
+    plain = N.build(rep, ["보통인부"])
+    assert not [b for b in plain if isinstance(b, N.NomuFootnote)]
+
+
 def test_build_header_display_order(hwp_path):
     rep = read_hwp(hwp_path)
     blocks = N.build(rep, ["보통인부"])

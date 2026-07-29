@@ -54,6 +54,11 @@ class NomuAvg:
     past_count: int = 3
 
 
+@dataclass(frozen=True)
+class NomuFootnote:
+    lines: list
+
+
 def standard_set():
     return list(STANDARD_SET)
 
@@ -96,4 +101,11 @@ def build(report, selected):
             ))
         valid = [d for d in deltas if d is not None]
         blocks.append(NomuAvg(sum(valid) / len(valid) if valid else None, past_count=p))
+
+    # 선택 직종에 실제로 있는 마커만, hwp 원문 각주 문장으로 하단에 표기
+    notes = report.marker_notes or {}
+    present = {r.marker for r in picked if r.marker}
+    footnote = [notes[m] for m in ("*", "**") if m in present and m in notes]
+    if footnote:
+        blocks.append(NomuFootnote(footnote))
     return blocks
