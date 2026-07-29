@@ -11,6 +11,10 @@ RATE_COLOR = "FFFF0000"           # 적용율(빨강)
 
 COL_WIDTHS = {"A": 4.2, "B": 10.2, "C": 14.1, "D": 10.2, "E": 12.6,
               "G": 10.2, "H": 12.4, "I": 10.2, "K": 2.5}
+NOMU_COL_WIDTHS = {"A": 6.0, "B": 16.0, "C": 7.0, "D": 11.0, "E": 11.0,
+                   "F": 11.0, "G": 12.0, "H": 9.0, "I": 12.0}
+COMMA_FMT = "#,##0"
+PCT_FMT = "0.0%"
 ROW_TITLE_H = 35.1
 ROW_BODY_H = 20.1
 
@@ -21,6 +25,10 @@ def body_font():
 
 def title_font():
     return Font(name=TITLE_FONT_NAME, size=24)
+
+
+def bold_font():
+    return Font(name=BODY_FONT_NAME, size=11, bold=True)
 
 
 def section_font():

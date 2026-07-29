@@ -1,4 +1,5 @@
 import openpyxl
+from openpyxl import Workbook
 from src import sheet_model as M
 from src import renderer
 
@@ -10,6 +11,15 @@ def _blocks():
         M.NoteLines(["    ☞ 계상금액 : 직접노무비 × 적용율"]),
         M.AppliedRate("    ☞ 적 용 율 :  ", 0.126, fmt="0.0%"),
     ]
+
+
+def test_render_sheet_draws_into_given_ws(tmp_path):
+    from src import renderer, styles
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "직접"
+    renderer.render_sheet(ws, _blocks(), col_widths=styles.COL_WIDTHS)
+    assert ws["A2"].value == "공사비 산출 적용근거"
 
 
 def test_render_writes_title_merged(tmp_path):
@@ -114,3 +124,29 @@ def test_table_header_filled_and_highlight(tmp_path):
                 hirow = c
     assert hdr.fill.fgColor.rgb == "FFDBE5F1"
     assert hirow.fill.fgColor.rgb == "FFFFF2CC"
+
+
+def test_nomu_render_row_and_avg(tmp_path):
+    from src import renderer, styles, nomu_model as N
+    blocks = [
+        N.NomuTitle("7.2026년도 상반기 시중노무임 산출"),
+        N.NomuHeader(["2024.9.1", "2025.1.1", "2025.9.1"], "2026.1.1"),
+        N.NomuGroup("Ⅰ", "일반공사직종"),
+        N.NomuRow(75, "보통인부", "1002", [167081, 169804, 171037], 172068, 0.006028, ""),
+        N.NomuAvg(0.006028),
+    ]
+    wb = __import__("openpyxl").Workbook()
+    ws = wb.active
+    renderer.render_sheet(ws, blocks, styles.NOMU_COL_WIDTHS)
+    vals = [c.value for row in ws.iter_rows() for c in row if c.value not in (None, "")]
+    assert "7.2026년도 상반기 시중노무임 산출" in vals
+    assert "보통인부" in vals
+    assert 172068 in vals            # 현재 노임
+    assert "노임변동률평균" in vals
+    # 현재 노임 셀은 콤마 서식
+    cur = next(c for row in ws.iter_rows() for c in row if c.value == 172068)
+    assert cur.number_format == "#,##0"
+    # 변동율 셀은 백분율 서식
+    d = next(c for row in ws.iter_rows() for c in row
+             if isinstance(c.value, float) and abs(c.value - 0.006028) < 1e-6)
+    assert d.number_format == "0.0%"

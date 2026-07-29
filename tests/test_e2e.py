@@ -65,6 +65,38 @@ def test_build_output_no_template_dependency(tmp_path, tomok_path):
     assert any("50억 이상" in t for t in texts)  # 30억 → 압축형 참조행
 
 
+def test_build_output_two_sheets(tmp_path, tomok_path, hwp_path):
+    from src import builder
+    from src.lookup import compute_rates
+    from src.nomu_model import standard_set
+    params = dict(kind="토목", jikjeop_cost=500_000_000, days=200,
+                  contract="경쟁", sanjae_basis="한전", sanan_target=400_000_000)
+    rates = compute_rates(tomok_path, params)
+    out = str(tmp_path / "two.xlsx")
+    builder.build_output(rates, out, params=params, jebiyul_path=tomok_path,
+                         hwp_path=hwp_path, selected_nomu=standard_set())
+    wb = openpyxl.load_workbook(out)
+    assert "7.통신노무임" in wb.sheetnames
+    assert "8.적용근거" in wb.sheetnames
+    v7 = [c.value for row in wb["7.통신노무임"].iter_rows()
+          for c in row if c.value not in (None, "")]
+    assert any("시중노무임 산출" in str(x) for x in v7)
+    assert 172068 in v7  # 보통인부 현재 노임
+
+
+def test_build_output_hwp_optional(tmp_path, tomok_path):
+    """hwp 없이 호출하면 기존과 동일하게 단일 시트(적용근거)만 생성된다."""
+    from src import builder
+    from src.lookup import compute_rates
+    params = dict(kind="토목", jikjeop_cost=500_000_000, days=200,
+                  contract="경쟁", sanjae_basis="한전", sanan_target=400_000_000)
+    rates = compute_rates(tomok_path, params)
+    out = str(tmp_path / "one.xlsx")
+    builder.build_output(rates, out, params=params, jebiyul_path=tomok_path)
+    wb = openpyxl.load_workbook(out)
+    assert wb.sheetnames == ["적용근거"]
+
+
 def test_build_output_over_50_expands(tmp_path, tomok_path):
     """≥50억이면 참조행 대신 실제 규모구간이 펼쳐진다."""
     params = dict(kind="토목", jikjeop_cost=100_000_000_000, days=400,
