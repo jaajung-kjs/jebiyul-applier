@@ -8,6 +8,7 @@ from openpyxl.utils import get_column_letter
 
 from src import styles
 from src import sheet_model as M
+from src import nomu_model as NM
 
 
 class _Cursor:
@@ -56,6 +57,16 @@ def _emit(ws, block, cur):
         _emit_applied(ws, block, cur)
     elif isinstance(block, M.BandTable):
         _emit_table(ws, block, cur)   # Task 4~5에서 구현
+    elif isinstance(block, NM.NomuTitle):
+        _emit_nomu_title(ws, block, cur)
+    elif isinstance(block, NM.NomuHeader):
+        _emit_nomu_header(ws, block, cur)
+    elif isinstance(block, NM.NomuGroup):
+        _emit_nomu_group(ws, block, cur)
+    elif isinstance(block, NM.NomuRow):
+        _emit_nomu_row(ws, block, cur)
+    elif isinstance(block, NM.NomuAvg):
+        _emit_nomu_avg(ws, block, cur)
     else:
         raise TypeError(f"unknown block: {block!r}")
 
@@ -191,3 +202,82 @@ def _put(ws, row, c0, c1, value, fill=None, align=None, border=False, fmt=None, 
         for rr in range(row, r1 + 1):
             for col in range(c0, c1 + 1):
                 ws.cell(rr, col).border = b
+
+
+_NOMU_C0 = 4  # 과거열 시작(D)
+
+
+def _nomu_cols(p):
+    """과거열 p개일 때 (과거 시작, 현재, 변동율, 비고) 열 인덱스."""
+    cur_c = _NOMU_C0 + p
+    return _NOMU_C0, cur_c, cur_c + 1, cur_c + 2
+
+
+def _emit_nomu_title(ws, block, cur):
+    r = cur.take(1)
+    ws.row_dimensions[r].height = styles.ROW_TITLE_H
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=9)
+    c = ws.cell(r, 1)
+    c.value = block.text
+    c.font = styles.bold_font()
+    c.alignment = styles.center()
+
+
+def _emit_nomu_header(ws, block, cur):
+    p = len(block.past_cols)
+    past0, cur_c, delta_c, note_c = _nomu_cols(p)
+    r1 = cur.take(1)
+    r2 = cur.take(1)
+    for r in (r1, r2):
+        ws.row_dimensions[r].height = styles.ROW_BODY_H
+
+    def hdr(row, c0, c1, text, rowspan=1):
+        _put(ws, row, c0, c1, text, fill=styles.header_fill(),
+             align=styles.center(wrap=True), border=True, rowspan=rowspan)
+
+    hdr(r1, 1, 1, "번호", rowspan=2)
+    hdr(r1, 2, 2, "직  종  명", rowspan=2)
+    hdr(r1, 3, 3, "No.", rowspan=2)
+    hdr(r1, past0, past0 + p - 1, "공 표 일")
+    hdr(r1, cur_c, cur_c, block.current_col, rowspan=2)
+    hdr(r1, delta_c, delta_c, "변동율\n(%)", rowspan=2)
+    hdr(r1, note_c, note_c, "비  고", rowspan=2)
+    for j, label in enumerate(block.past_cols):
+        hdr(r2, past0 + j, past0 + j, label)
+
+
+def _emit_nomu_group(ws, block, cur):
+    r = cur.take(1)
+    ws.row_dimensions[r].height = styles.ROW_BODY_H
+    c = ws.cell(r, 2)
+    c.value = f"{block.roman}. {block.name}"
+    c.font = styles.bold_font()
+    c.alignment = styles.left()
+
+
+def _emit_nomu_row(ws, block, cur):
+    p = len(block.past_wages)
+    past0, cur_c, delta_c, note_c = _nomu_cols(p)
+    r = cur.take(1)
+    ws.row_dimensions[r].height = styles.ROW_BODY_H
+    _put(ws, r, 1, 1, block.no, align=styles.center(), border=True)
+    _put(ws, r, 2, 2, block.name, align=styles.left(), border=True)
+    _put(ws, r, 3, 3, int(block.code), align=styles.center(), border=True)
+    for j, w in enumerate(block.past_wages):
+        _put(ws, r, past0 + j, past0 + j, w, align=styles.right(),
+             border=True, fmt=styles.COMMA_FMT)
+    _put(ws, r, cur_c, cur_c, block.current_wage, align=styles.right(),
+         border=True, fmt=styles.COMMA_FMT)
+    _put(ws, r, delta_c, delta_c, block.delta, align=styles.center(),
+         border=True, fmt=styles.PCT_FMT)
+    _put(ws, r, note_c, note_c, block.note or None, align=styles.center(), border=True)
+
+
+def _emit_nomu_avg(ws, block, cur):
+    # 직전 노무임 행에서 열 수를 알 수 없으므로 표준 4열(과거3) 기준 변동율 열에 기입
+    past0, cur_c, delta_c, note_c = _nomu_cols(3)
+    r = cur.take(1)
+    ws.row_dimensions[r].height = styles.ROW_BODY_H
+    _put(ws, r, 2, 2, "노임변동률평균", align=styles.center(), border=True)
+    _put(ws, r, delta_c, delta_c, block.value, align=styles.center(),
+         border=True, fmt=styles.PCT_FMT)
