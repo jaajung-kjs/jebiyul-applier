@@ -61,3 +61,44 @@ def test_read_grids_recovers_tongsin_row(hwp_path):
     assert row[1] == "통신설비공"
     assert row[2].replace(",", "") == "315528"
     assert row[5].replace(",", "") == "305050"
+
+
+from src.hwp_reader import read_hwp, HwpFormatError
+
+
+def test_read_hwp_golden_values(hwp_path):
+    rep = read_hwp(hwp_path)
+    assert rep.dates[0] == "2026.1.1"      # 최신이 첫 열
+    assert rep.half == "2026년도 상반기"
+    bo = rep.rates["보통인부"]
+    assert bo.wages[0] == 172068           # 현재(2026.1.1)
+    assert bo.wages[1] == 171037           # 직전(2025.9.1)
+    assert bo.bumun == "일반공사"
+    ts = rep.rates["통신설비공"]
+    assert ts.code == "1087"
+    assert ts.wages == (315528, 314787, 308930, 305050)
+
+
+def test_read_hwp_bumun_by_code_prefix(hwp_path):
+    rep = read_hwp(hwp_path)
+    # 5xxx = 기타
+    assert rep.rates["전기공사기사"].bumun == "기타"
+    # 화물차운전사(1049)는 코드 prefix상 일반공사(보고서 분류)
+    assert rep.rates["화물차운전사"].bumun == "일반공사"
+
+
+def test_read_hwp_handles_markers_and_missing(hwp_path):
+    rep = read_hwp(hwp_path)
+    # 미조사(**) 직종 중에는 wages가 모두 None인 경우가 있어야 함(값 파싱 시 '-' → None 확인).
+    # 문서 수록 순서상 첫 **직종(연마공 1032)은 2025.9.1 한 시점만 실측치가 남아있으므로
+    # 특정 인덱스가 아니라 "존재 여부"로 검증한다(실 데이터 기준 — .superpowers/sdd/task-2-report.md 참조).
+    misugjo = [r for r in rep.rates.values() if r.marker == "**"]
+    assert misugjo, "** 마커 직종이 있어야 함"
+    assert any(all(w is None for w in r.wages) for r in misugjo)
+
+
+def test_read_hwp_fail_loud_on_non_hwp(tmp_path):
+    bad = tmp_path / "x.txt"
+    bad.write_text("not hwp")
+    with pytest.raises(HwpFormatError):
+        read_hwp(str(bad))
