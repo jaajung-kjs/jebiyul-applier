@@ -20,20 +20,25 @@ class _Cursor:
         return r
 
 
-def _apply_dims(ws):
-    for col, w in styles.COL_WIDTHS.items():
+def _apply_dims(ws, col_widths):
+    for col, w in col_widths.items():
         ws.column_dimensions[col].width = w
+
+
+def render_sheet(ws, blocks, col_widths=None):
+    _apply_dims(ws, col_widths or styles.COL_WIDTHS)
+    cur = _Cursor()
+    cur.take(1)  # row 1 여백
+    for block in blocks:
+        _emit(ws, block, cur)
+    return ws
 
 
 def render(blocks, out_path):
     wb = Workbook()
     ws = wb.active
     ws.title = "적용근거"
-    _apply_dims(ws)
-    cur = _Cursor()
-    cur.take(1)  # row 1 여백
-    for block in blocks:
-        _emit(ws, block, cur)
+    render_sheet(ws, blocks, styles.COL_WIDTHS)
     wb.save(out_path)
     return out_path
 

@@ -1,4 +1,5 @@
 import openpyxl
+from openpyxl import Workbook
 from src import sheet_model as M
 from src import renderer
 
@@ -10,6 +11,15 @@ def _blocks():
         M.NoteLines(["    ☞ 계상금액 : 직접노무비 × 적용율"]),
         M.AppliedRate("    ☞ 적 용 율 :  ", 0.126, fmt="0.0%"),
     ]
+
+
+def test_render_sheet_draws_into_given_ws(tmp_path):
+    from src import renderer, styles
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "직접"
+    renderer.render_sheet(ws, _blocks(), col_widths=styles.COL_WIDTHS)
+    assert ws["A2"].value == "공사비 산출 적용근거"
 
 
 def test_render_writes_title_merged(tmp_path):
