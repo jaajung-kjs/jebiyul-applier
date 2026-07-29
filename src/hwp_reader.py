@@ -60,6 +60,9 @@ def read_grids(path):
     if not olefile.isOleFile(path):
         raise HwpFormatError(f"HWP(OLE) 파일이 아님: {path}")
     ole = olefile.OleFileIO(path)
+    if "FileHeader" not in ["/".join(s) for s in ole.listdir()] or \
+            not ole.openstream("FileHeader").read(17) == b"HWP Document File":
+        raise HwpFormatError(f"HWP 5.x 문서가 아님(FileHeader 서명 불일치): {path}")
     grids = []
     for buf in _section_bytes(ole):
         cur = None
