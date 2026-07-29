@@ -14,7 +14,8 @@ def test_build_groups_and_delta(hwp_path):
     rep = read_hwp(hwp_path)
     blocks = N.build(rep, ["보통인부", "통신설비공", "전기공사기사"])
     kinds = [type(b).__name__ for b in blocks]
-    assert kinds[0] == "NomuHeader"   # 제목 행 없이 헤더부터 시작
+    assert kinds[0] == "NomuTitle"
+    assert "NomuHeader" in kinds
     groups = [b for b in blocks if isinstance(b, N.NomuGroup)]
     # 보통인부·통신설비공=일반공사(Ⅰ), 전기공사기사=기타(Ⅱ, 앞선 부문만 카운트)
     assert [g.name for g in groups] == ["일반공사직종", "기타직종"]

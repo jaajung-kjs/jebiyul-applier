@@ -139,6 +139,17 @@ def _nomu_ws(N, renderer, styles):
     return ws
 
 
+def test_nomu_title_matches_apply_sheet_style(tmp_path):
+    """노무임 제목이 적용근거 제목과 같은 title_font로 크게 렌더된다."""
+    from src import renderer, styles, nomu_model as N
+    wb = __import__("openpyxl").Workbook()
+    ws = wb.active
+    renderer.render_sheet(ws, [N.NomuTitle("시중노무임 산출")], styles.NOMU_COL_WIDTHS)
+    c = next(c for row in ws.iter_rows() for c in row if c.value == "시중노무임 산출")
+    assert c.font.name == styles.TITLE_FONT_NAME
+    assert c.font.size == 24
+
+
 def test_nomu_render_row_and_formulas(tmp_path):
     from src import renderer, styles, nomu_model as N
     ws = _nomu_ws(N, renderer, styles)

@@ -57,6 +57,8 @@ def _emit(ws, block, cur):
         _emit_applied(ws, block, cur)
     elif isinstance(block, M.BandTable):
         _emit_table(ws, block, cur)   # Task 4~5에서 구현
+    elif isinstance(block, NM.NomuTitle):
+        _emit_nomu_title(ws, block, cur)
     elif isinstance(block, NM.NomuHeader):
         _emit_nomu_header(ws, block, cur)
     elif isinstance(block, NM.NomuGroup):
@@ -220,6 +222,18 @@ def _nomu_grid(ws, r, last_col):
     b = styles.box_border()
     for col in range(1, last_col + 1):
         ws.cell(r, col).border = b
+
+
+def _emit_nomu_title(ws, block, cur):
+    """옆 시트(적용근거) 제목과 동일한 디자인(title_font, 병합, 가운데)."""
+    r = cur.take(1)
+    ws.row_dimensions[r].height = styles.ROW_TITLE_H
+    last = _nomu_cols(block.past_count)[-1]
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=last)
+    c = ws.cell(r, 1)
+    c.value = block.text
+    c.font = styles.title_font()
+    c.alignment = styles.center()
 
 
 def _emit_nomu_header(ws, block, cur):
