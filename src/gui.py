@@ -109,6 +109,7 @@ def run_app(on_submit):
         try:
             report = read_hwp(p)
         except Exception as e:
+            hwp_path.set("")
             messagebox.showerror("hwp 읽기 실패", str(e))
             return
         for name, on in nomu_model.preselect(list(report.order)):
@@ -136,7 +137,10 @@ def run_app(on_submit):
         params["selected_nomu"] = [n for n, v in nomu_vars.items() if v.get()] or None
         try:
             out = on_submit(params)
-            messagebox.showinfo("완료", f"생성 완료:\n{out}")
+            if params.get("selected_nomu"):
+                messagebox.showinfo("완료", f"생성 완료 (7.통신노무임 포함):\n{out}")
+            else:
+                messagebox.showinfo("완료", f"생성 완료:\n{out}")
         except Exception as e:
             messagebox.showerror("생성 실패", str(e))
 
