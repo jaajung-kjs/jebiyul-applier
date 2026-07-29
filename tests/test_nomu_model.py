@@ -40,3 +40,16 @@ def test_build_header_display_order(hwp_path):
     hdr = next(b for b in blocks if isinstance(b, N.NomuHeader))
     assert hdr.current_col == "2026.1.1"
     assert hdr.past_cols == ["2024.9.1", "2025.1.1", "2025.9.1"]  # 오래된→최신
+
+
+def test_preselect_marks_standard(hwp_path):
+    rep = read_hwp(hwp_path)
+    pairs = N.preselect(list(rep.order))
+    checked = {n for n, on in pairs if on}
+    assert "통신설비공" in checked
+    assert "보통인부" in checked
+    # 비표준(예: 도편수 등 국가유산)은 기본 미체크
+    unchecked = {n for n, on in pairs if not on}
+    assert unchecked, "표준세트 밖 직종은 미체크로 남아야"
+    # 순서 보존
+    assert [n for n, _ in pairs] == list(rep.order)

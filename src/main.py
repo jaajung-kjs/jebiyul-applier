@@ -14,6 +14,8 @@ def generate(params: dict, out_path: str) -> str:
         compute_rates 가 요구하는 키-값 집합.
         jebiyul_path, jikjeop_cost, days, kind, contract,
         sanjae_basis, sanan_target.
+        선택: hwp_path, selected_nomu — 둘 다 있으면 '7.통신노무임'
+        시트가 추가된다(없으면 기존과 동일한 단일 시트).
     out_path : str
         저장할 결과 파일 경로.
 
@@ -24,7 +26,9 @@ def generate(params: dict, out_path: str) -> str:
     """
     rates = compute_rates(params["jebiyul_path"], params)
     return build_output(rates, out_path, params=params,
-                        jebiyul_path=params["jebiyul_path"])
+                        jebiyul_path=params["jebiyul_path"],
+                        hwp_path=params.get("hwp_path"),
+                        selected_nomu=params.get("selected_nomu"))
 
 
 def _default_out() -> str:

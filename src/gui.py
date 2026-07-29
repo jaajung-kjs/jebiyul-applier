@@ -3,6 +3,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 from src.mapping import KINDS
+from src.hwp_reader import read_hwp
+from src import nomu_model
 
 
 def validate_inputs(raw: dict) -> dict:
@@ -50,6 +52,8 @@ def run_app(on_submit):
     kind = tk.StringVar(value=KINDS[1])
     contract = tk.StringVar(value="경쟁")
     sanjae = tk.StringVar(value="한전")
+    hwp_path = tk.StringVar()
+    nomu_vars: dict = {}
 
     rows = [
         ("직접공사비(원)", "jikjeop_cost"),
@@ -82,6 +86,43 @@ def run_app(on_submit):
     ttk.Label(root, textvariable=vars_["jebiyul_path"]).grid(
         row=7, column=0, columnspan=2)
 
+    # --- 임금실태조사(hwp) 선택 + 직종 체크리스트 (선택 사항) ---
+    nomu_canvas = tk.Canvas(root, height=150, highlightthickness=0)
+    nomu_scroll = ttk.Scrollbar(root, orient="vertical",
+                                command=nomu_canvas.yview)
+    nomu_frame = ttk.Frame(nomu_canvas)
+    nomu_frame.bind(
+        "<Configure>",
+        lambda e: nomu_canvas.configure(scrollregion=nomu_canvas.bbox("all")),
+    )
+    nomu_canvas.create_window((0, 0), window=nomu_frame, anchor="nw")
+    nomu_canvas.configure(yscrollcommand=nomu_scroll.set)
+
+    def pick_hwp():
+        p = filedialog.askopenfilename(filetypes=[("HWP", "*.hwp")])
+        if not p:
+            return
+        hwp_path.set(p)
+        for child in nomu_frame.winfo_children():
+            child.destroy()
+        nomu_vars.clear()
+        try:
+            report = read_hwp(p)
+        except Exception as e:
+            messagebox.showerror("hwp 읽기 실패", str(e))
+            return
+        for name, on in nomu_model.preselect(list(report.order)):
+            var = tk.BooleanVar(value=on)
+            nomu_vars[name] = var
+            tk.Checkbutton(nomu_frame, text=name, variable=var).pack(anchor="w")
+
+    ttk.Button(root, text="임금실태조사(hwp) 파일 선택",
+               command=pick_hwp).grid(row=8, column=0, columnspan=2)
+    ttk.Label(root, textvariable=hwp_path).grid(
+        row=9, column=0, columnspan=2)
+    nomu_canvas.grid(row=10, column=0, sticky="nsew")
+    nomu_scroll.grid(row=10, column=1, sticky="ns")
+
     def submit():
         raw = {k: v.get() for k, v in vars_.items()}
         raw.update(kind=kind.get(), contract=contract.get(),
@@ -91,6 +132,8 @@ def run_app(on_submit):
         except ValueError as e:
             messagebox.showerror("입력 오류", str(e))
             return
+        params["hwp_path"] = hwp_path.get() or None
+        params["selected_nomu"] = [n for n, v in nomu_vars.items() if v.get()] or None
         try:
             out = on_submit(params)
             messagebox.showinfo("완료", f"생성 완료:\n{out}")
@@ -98,5 +141,5 @@ def run_app(on_submit):
             messagebox.showerror("생성 실패", str(e))
 
     ttk.Button(root, text="적용근거 생성",
-               command=submit).grid(row=8, column=0, columnspan=2)
+               command=submit).grid(row=11, column=0, columnspan=2)
     root.mainloop()

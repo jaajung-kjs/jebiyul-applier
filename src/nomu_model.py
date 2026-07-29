@@ -56,6 +56,12 @@ def standard_set():
     return list(STANDARD_SET)
 
 
+def preselect(all_names, standard=None):
+    """(직종명, 체크여부) 쌍을 보고서 순서대로. 표준세트만 True."""
+    std = set(standard if standard is not None else STANDARD_SET)
+    return [(n, n in std) for n in all_names]
+
+
 def _delta(rate):
     cur, prev = rate.wages[0], rate.wages[1]
     if cur is None or prev is None or prev == 0:
