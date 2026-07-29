@@ -42,6 +42,16 @@ def test_build_header_display_order(hwp_path):
     assert hdr.past_cols == ["2024.9.1", "2025.1.1", "2025.9.1"]  # 오래된→최신
 
 
+def test_build_sets_past_count_from_dates(hwp_path):
+    rep = read_hwp(hwp_path)
+    blocks = N.build(rep, ["보통인부", "특별인부"])
+    expected_p = len(rep.dates) - 1
+    title = next(b for b in blocks if isinstance(b, N.NomuTitle))
+    avgs = [b for b in blocks if isinstance(b, N.NomuAvg)]
+    assert title.past_count == expected_p
+    assert avgs and all(a.past_count == expected_p for a in avgs)
+
+
 def test_preselect_marks_standard(hwp_path):
     rep = read_hwp(hwp_path)
     pairs = N.preselect(list(rep.order))

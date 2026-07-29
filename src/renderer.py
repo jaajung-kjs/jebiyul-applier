@@ -216,7 +216,8 @@ def _nomu_cols(p):
 def _emit_nomu_title(ws, block, cur):
     r = cur.take(1)
     ws.row_dimensions[r].height = styles.ROW_TITLE_H
-    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=9)
+    end_column = _nomu_cols(block.past_count)[-1]
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=end_column)
     c = ws.cell(r, 1)
     c.value = block.text
     c.font = styles.bold_font()
@@ -274,8 +275,7 @@ def _emit_nomu_row(ws, block, cur):
 
 
 def _emit_nomu_avg(ws, block, cur):
-    # 직전 노무임 행에서 열 수를 알 수 없으므로 표준 4열(과거3) 기준 변동율 열에 기입
-    past0, cur_c, delta_c, note_c = _nomu_cols(3)
+    past0, cur_c, delta_c, note_c = _nomu_cols(block.past_count)
     r = cur.take(1)
     ws.row_dimensions[r].height = styles.ROW_BODY_H
     _put(ws, r, 2, 2, "노임변동률평균", align=styles.center(), border=True)

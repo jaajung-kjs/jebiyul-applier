@@ -22,6 +22,7 @@ STANDARD_SET = (
 @dataclass(frozen=True)
 class NomuTitle:
     text: str
+    past_count: int = 3
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class NomuRow:
 @dataclass(frozen=True)
 class NomuAvg:
     value: object
+    past_count: int = 3
 
 
 def standard_set():
@@ -71,8 +73,9 @@ def _delta(rate):
 
 def build(report, selected):
     picked = [report.rates[n] for n in selected if n in report.rates]
+    p = len(report.dates) - 1
     blocks = [
-        NomuTitle(f"7.{report.half} 시중노무임 산출"),
+        NomuTitle(f"7.{report.half} 시중노무임 산출", past_count=p),
         NomuHeader(list(reversed(report.dates[1:])), report.dates[0]),
     ]
     gi = 0
@@ -92,5 +95,5 @@ def build(report, selected):
                 current_wage=r.wages[0], delta=d, note=r.marker,
             ))
         valid = [d for d in deltas if d is not None]
-        blocks.append(NomuAvg(sum(valid) / len(valid) if valid else None))
+        blocks.append(NomuAvg(sum(valid) / len(valid) if valid else None, past_count=p))
     return blocks
