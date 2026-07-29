@@ -21,3 +21,13 @@ def geonchuk_path():
     if not os.path.exists(_GEONCHUK):
         pytest.skip("제비율 원본(건축) 파일 없음 — 골든 테스트 skip")
     return _GEONCHUK
+
+
+_HWP = os.path.join(ROOT, "[붙임] 2026년 상반기 적용 건설업 임금실태조사 보고서.hwp")
+
+
+@pytest.fixture
+def hwp_path():
+    if not os.path.exists(_HWP):
+        pytest.skip("임금실태조사 hwp 파일 없음 — 골든 테스트 skip")
+    return _HWP
