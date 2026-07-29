@@ -14,8 +14,7 @@ def test_build_groups_and_delta(hwp_path):
     rep = read_hwp(hwp_path)
     blocks = N.build(rep, ["보통인부", "통신설비공", "전기공사기사"])
     kinds = [type(b).__name__ for b in blocks]
-    assert kinds[0] == "NomuTitle"
-    assert "NomuHeader" in kinds
+    assert kinds[0] == "NomuHeader"   # 제목 행 없이 헤더부터 시작
     groups = [b for b in blocks if isinstance(b, N.NomuGroup)]
     # 보통인부·통신설비공=일반공사(Ⅰ), 전기공사기사=기타(Ⅱ, 앞선 부문만 카운트)
     assert [g.name for g in groups] == ["일반공사직종", "기타직종"]
@@ -46,9 +45,9 @@ def test_build_sets_past_count_from_dates(hwp_path):
     rep = read_hwp(hwp_path)
     blocks = N.build(rep, ["보통인부", "특별인부"])
     expected_p = len(rep.dates) - 1
-    title = next(b for b in blocks if isinstance(b, N.NomuTitle))
+    groups = [b for b in blocks if isinstance(b, N.NomuGroup)]
     avgs = [b for b in blocks if isinstance(b, N.NomuAvg)]
-    assert title.past_count == expected_p
+    assert groups and all(g.past_count == expected_p for g in groups)
     assert avgs and all(a.past_count == expected_p for a in avgs)
 
 

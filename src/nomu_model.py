@@ -20,12 +20,6 @@ STANDARD_SET = (
 
 
 @dataclass(frozen=True)
-class NomuTitle:
-    text: str
-    past_count: int = 3
-
-
-@dataclass(frozen=True)
 class NomuHeader:
     past_cols: list
     current_col: str
@@ -76,7 +70,6 @@ def build(report, selected):
     picked = [report.rates[n] for n in selected if n in report.rates]
     p = len(report.dates) - 1
     blocks = [
-        NomuTitle(f"7.{report.half} 시중노무임 산출", past_count=p),
         NomuHeader(list(reversed(report.dates[1:])), report.dates[0]),
     ]
     gi = 0

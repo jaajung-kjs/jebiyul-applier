@@ -80,7 +80,7 @@ def test_build_output_two_sheets(tmp_path, tomok_path, hwp_path):
     assert "8.적용근거" in wb.sheetnames
     v7 = [c.value for row in wb["7.통신노무임"].iter_rows()
           for c in row if c.value not in (None, "")]
-    assert any("시중노무임 산출" in str(x) for x in v7)
+    assert any("일반공사직종" in str(x) for x in v7)  # 부문 그룹 헤더
     assert 172068 in v7  # 보통인부 현재 노임
 
 

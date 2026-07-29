@@ -126,10 +126,8 @@ def test_table_header_filled_and_highlight(tmp_path):
     assert hirow.fill.fgColor.rgb == "FFFFF2CC"
 
 
-def test_nomu_render_row_and_avg(tmp_path):
-    from src import renderer, styles, nomu_model as N
+def _nomu_ws(N, renderer, styles):
     blocks = [
-        N.NomuTitle("7.2026년도 상반기 시중노무임 산출"),
         N.NomuHeader(["2024.9.1", "2025.1.1", "2025.9.1"], "2026.1.1"),
         N.NomuGroup("Ⅰ", "일반공사직종"),
         N.NomuRow(75, "보통인부", "1002", [167081, 169804, 171037], 172068, 0.006028, ""),
@@ -138,46 +136,64 @@ def test_nomu_render_row_and_avg(tmp_path):
     wb = __import__("openpyxl").Workbook()
     ws = wb.active
     renderer.render_sheet(ws, blocks, styles.NOMU_COL_WIDTHS)
+    return ws
+
+
+def test_nomu_render_row_and_formulas(tmp_path):
+    from src import renderer, styles, nomu_model as N
+    ws = _nomu_ws(N, renderer, styles)
     vals = [c.value for row in ws.iter_rows() for c in row if c.value not in (None, "")]
-    assert "7.2026년도 상반기 시중노무임 산출" in vals
     assert "보통인부" in vals
-    assert 172068 in vals            # 현재 노임
+    assert 172068 in vals            # 현재 노임(실제 적용값)
     assert "노임변동률평균" in vals
     # 현재 노임 셀은 콤마 서식
     cur = next(c for row in ws.iter_rows() for c in row if c.value == 172068)
     assert cur.number_format == "#,##0"
-    # 변동율 셀은 백분율 서식
-    d = next(c for row in ws.iter_rows() for c in row
-             if isinstance(c.value, float) and abs(c.value - 0.006028) < 1e-6)
-    assert d.number_format == "0.0%"
+    r = cur.row  # 보통인부 데이터 행
+    # 변동율은 하드코딩 값이 아니라 계산식: =(현재-직전)/직전
+    delta = ws.cell(r, 8)   # H열(과거3 → 변동율)
+    assert delta.value == "=(G%d-F%d)/F%d" % (r, r, r)
+    assert delta.number_format == "0.0%"
+    # 노임변동률평균도 계산식(AVERAGE)
+    avg_r = next(c.row for row in ws.iter_rows() for c in row if c.value == "노임변동률평균")
+    avg = ws.cell(avg_r, 8)
+    assert avg.value == "=AVERAGE(H%d:H%d)" % (r, r)
+    assert avg.number_format == "0.0%"
 
 
-def test_nomu_group_and_avg_rows_have_continuous_borders(tmp_path):
-    """그룹 헤더·평균 행도 가로 테두리와 좌/우 외곽선이 이어진다(빈 칸 세로선은 생략)."""
+def test_nomu_current_column_highlighted(tmp_path):
+    """실제 적용되는 현재 시점 열이 표 전체 높이에 걸쳐 끊김 없이 강조된다."""
     from src import renderer, styles, nomu_model as N
-    blocks = [
-        N.NomuHeader(["2024.9.1", "2025.1.1", "2025.9.1"], "2026.1.1"),
-        N.NomuGroup("Ⅰ", "일반공사직종"),
-        N.NomuRow(75, "보통인부", "1002", [167081, 169804, 171037], 172068, 0.006028, ""),
-        N.NomuAvg(0.006028),
-    ]
-    wb = __import__("openpyxl").Workbook()
-    ws = wb.active
-    renderer.render_sheet(ws, blocks, styles.NOMU_COL_WIDTHS)
+    ws = _nomu_ws(N, renderer, styles)
+    cur = next(c for row in ws.iter_rows() for c in row if c.value == 172068)
+    cur_c = cur.column  # 현재 노임(=적용) 열
+    # 헤더·데이터·그룹헤더·평균 행 모두 현재열이 강조된다(연속 띠)
+    labels = ("2026.1.1", 172068, "Ⅰ. 일반공사직종", "노임변동률평균")
+    for label in labels:
+        r = next(c.row for row in ws.iter_rows() for c in row if c.value == label)
+        cell = ws.cell(r, cur_c)
+        assert cell.fill.fgColor.rgb == styles.HIGHLIGHT_FILL_RGB, f"{label} 현재열 강조 없음"
+    # 본문(그룹헤더~평균) 현재열에 강조 공백이 없다(띄엄띄엄 금지).
+    # (헤더 현재열은 rowspan 병합이라 구성원 셀 fill은 openpyxl로 안 읽혀 범위서 제외)
+    top = next(c.row for row in ws.iter_rows() for c in row if c.value == "Ⅰ. 일반공사직종")
+    bot = max(c.row for row in ws.iter_rows() for c in row if c.value == "노임변동률평균")
+    for r in range(top, bot + 1):
+        cell = ws.cell(r, cur_c)
+        assert cell.fill.fgColor.rgb == styles.HIGHLIGHT_FILL_RGB, f"r{r} 현재열 강조 끊김"
 
-    def has(side):
-        return side is not None and side.style
+
+def test_nomu_all_cells_have_full_borders(tmp_path):
+    """모든 행(그룹 헤더·평균 포함)의 모든 칸에 4면 테두리가 들어간다."""
+    from src import renderer, styles, nomu_model as N
+    ws = _nomu_ws(N, renderer, styles)
+
+    def full(c):
+        b = c.border
+        return all(getattr(b, k) is not None and getattr(b, k).style
+                   for k in ("top", "bottom", "left", "right"))
 
     note_c = 9  # 과거 3열 → 비고 = I열
-    for label in ("Ⅰ. 일반공사직종", "노임변동률평균"):
+    for label in ("Ⅰ. 일반공사직종", "노임변동률평균", "보통인부"):
         r = next(c.row for row in ws.iter_rows() for c in row if c.value == label)
-        # 행 전체에 가로(위/아래) 테두리가 이어진다
         for col in range(1, note_c + 1):
-            b = ws.cell(r, col).border
-            assert has(b.top) and has(b.bottom), f"{label} r{r} c{col} 가로 테두리 끊김"
-        # 좌/우 표 가장자리가 있다
-        assert has(ws.cell(r, 1).border.left), f"{label} 좌측 외곽선 없음"
-        assert has(ws.cell(r, note_c).border.right), f"{label} 우측 외곽선 없음"
-        # 내용 없는 중간 칸(C=3)은 세로 구분선이 없다(자연스러움)
-        empty = ws.cell(r, 3).border
-        assert not has(empty.left) and not has(empty.right), f"{label} 빈 칸 세로선 존재"
+            assert full(ws.cell(r, col)), f"{label} r{r} c{col} 테두리 누락"
