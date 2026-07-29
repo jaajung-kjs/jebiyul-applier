@@ -56,6 +56,17 @@ def box_border(outer="thin", inner="hair"):
                   left=side(outer), right=side(outer))
 
 
+def hframe_border(left=False, right=False, outer="thin"):
+    """가로(위/아래) 테두리 + 선택적 좌/우 외곽선.
+
+    내용 없는 셀에서도 가로 행 테두리와 표 가장자리는 이어지되, 중간 빈 칸의
+    세로 구분선은 넣지 않기 위한 부분 테두리.
+    """
+    return Border(top=side(outer), bottom=side(outer),
+                  left=side(outer) if left else None,
+                  right=side(outer) if right else None)
+
+
 def center(wrap=False):
     return Alignment(horizontal="center", vertical="center", wrap_text=wrap)
 
