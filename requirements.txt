@@ -1,3 +1,4 @@
 openpyxl==3.1.2
+olefile==0.47
 pytest==8.2.0
 pyinstaller==6.6.0
