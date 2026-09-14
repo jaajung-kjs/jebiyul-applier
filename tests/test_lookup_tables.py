@@ -154,3 +154,47 @@ def test_iyun_unchanged_after_row_remap(tomok_path):
     g = lambda s: table_rate(tomok_path, "이윤", "토목", s, "183", "경쟁")
     assert [g(s) for s in ("10억미만", "10-50억", "50-300억", "300-1000억", "1000억이상")] == \
            [pytest.approx(x) for x in (0.15, 0.15, 0.12, 0.10, 0.09)]
+
+
+# ── Fix 5: 공사종류 열을 헤더 텍스트로 찾는다(열 번호 하드코딩 제거) ──────────
+# 토목 파일: 간접노무비 토목=29, 조경=32, 산업설비(토목)=35
+# 건축 파일: 간접노무비 건축=29, 산업설비(건축)=34  ← 기존 DATA_COL은 35로 오인
+#            (병합 셀에 우연히 걸쳐 값만 맞았을 뿐 열 자체가 틀렸다)
+
+def _col(path, item, kind):
+    import openpyxl
+    from src.lookup import find_data_sheet, _col_for_item_kind
+    ws = find_data_sheet(openpyxl.load_workbook(path, data_only=True))
+    return _col_for_item_kind(ws, item, kind, kind)
+
+
+def test_kind_col_resolved_by_header_tomok(tomok_path):
+    assert _col(tomok_path, "간접노무비", "토목") == 29
+    assert _col(tomok_path, "간접노무비", "조경") == 32
+    assert _col(tomok_path, "간접노무비", "산업설비") == 35
+    assert _col(tomok_path, "기타경비", "조경") == 41
+
+
+def test_kind_col_resolved_by_header_geonchuk(geonchuk_path):
+    """건축 파일은 열 배치가 달라 산업설비가 34다(하드코딩 35가 아님)."""
+    assert _col(geonchuk_path, "간접노무비", "건축") == 29
+    assert _col(geonchuk_path, "간접노무비", "산업설비") == 34
+    assert _col(geonchuk_path, "기타경비", "산업설비") == 43
+
+
+def test_missing_kind_column_raises(geonchuk_path):
+    """건축 파일엔 조경 열이 없다 — 조용히 건축 값을 주지 말고 실패해야 한다."""
+    with pytest.raises(LookupError):
+        _col(geonchuk_path, "간접노무비", "조경")
+
+
+def test_jeonmun_follows_file_base_industry(tomok_path, geonchuk_path):
+    """전기통신소방전문은 파일 기본 업종(앵커 열)을 따른다.
+
+    파일 주석: '일반관리비요율을 제외한 각종 요율은 토목, 건축 등 관련
+    공사업종에 따라 적용'
+    """
+    assert (table_rate(tomok_path, "간접노무비", "전기통신소방전문", "10억미만", "183")
+            == table_rate(tomok_path, "간접노무비", "토목", "10억미만", "183"))
+    assert (table_rate(geonchuk_path, "간접노무비", "전기통신소방전문", "10억미만", "183")
+            == table_rate(geonchuk_path, "간접노무비", "건축", "10억미만", "183"))

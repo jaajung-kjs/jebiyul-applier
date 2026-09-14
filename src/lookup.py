@@ -81,24 +81,69 @@ def _ilban_jeonmun_col(ws):
         "일반관리비 '전문·전기·통신·소방' 열 헤더를 찾지 못함 — 제비율 양식 불일치")
 
 
-def _col_for_item_kind(ws, item, src_kind):
+# 공사종류 → 헤더 텍스트. '산업설비(토목)'/'산업설비(건축)'처럼 괄호가 붙는다.
+_KIND_HEADER_PREFIX = {
+    "토목": "토목", "건축": "건축", "조경": "조경", "산업설비": "산업설비",
+}
+
+
+def _item_block_end(ws, anc_col):
+    """항목 블록의 끝 열 — 오른쪽에 있는 다음 항목 앵커 열."""
+    right = []
+    for label in mapping.ANCHOR_LABEL.values():
+        try:
+            _, c = cell_text_search(ws, label)
+        except LookupError:
+            continue
+        if c > anc_col:
+            right.append(c)
+    return min(right) if right else anc_col + 25
+
+
+def _kind_col_by_header(ws, item, kind, anc_row, anc_col):
+    """항목 블록의 헤더행에서 공사종류 열을 찾는다. 없으면 None.
+
+    열 번호는 파일마다 다르므로(건축 파일은 산업설비가 34, 토목 파일은 35)
+    하드코딩하지 않고 헤더 텍스트로 해석한다.
+    """
+    prefix = _KIND_HEADER_PREFIX.get(kind)
+    if prefix is None:
+        return None
+    end_col = _item_block_end(ws, anc_col)
+    for r in range(anc_row, anc_row + 12):
+        for c in range(anc_col, end_col):
+            v = ws.cell(r, c).value
+            if isinstance(v, str):
+                t = v.replace(" ", "").replace("\n", "")
+                if t == prefix or t.startswith(prefix + "("):
+                    return c
+    return None
+
+
+def _col_for_item_kind(ws, item, src_kind, kind=None):
     """항목·종류에 맞는 데이터 열 번호(1-base)를 반환한다.
 
-    간접노무비·기타경비는 종류별로 열이 다르므로 DATA_COL 직접 참조.
-    일반관리비·이윤(및 DATA_COL에 없는 건축 계열)은 해당 항목 앵커 열 = 데이터 열.
-    단, 전기·통신·소방·전문 공사의 일반관리비는 전용 열을 쓴다(파일 주석 규칙:
-    "일반관리비요율을 제외한 각종 요율은 토목, 건축 등 관련 공사업종에 따라 적용").
+    - 간접노무비·기타경비: 블록 헤더에서 공사종류 열을 텍스트로 찾는다.
+    - 일반관리비·이윤: 앵커 열이 주 데이터 열. 단 전기·통신·소방·전문의
+      일반관리비는 전용 열을 쓴다(파일 주석: "일반관리비요율을 제외한 각종
+      요율은 토목, 건축 등 관련 공사업종에 따라 적용").
+    - 전기·통신·소방·전문의 그 외 항목: 파일 기본 업종(앵커 열)을 따른다.
     """
     if item == "일반관리비" and src_kind == "전기통신소방전문":
         return _ilban_jeonmun_col(ws)
-    key = (item, src_kind)
-    if key in mapping.DATA_COL:
-        return mapping.DATA_COL[key]
-    # 앵커 기반 열 결정:
-    #   - 일반관리비/이윤: 앵커가 있는 열이 주 데이터 열(토목·건축 파일 공통)
-    #   - 건축 파일의 '건축' 종류(간접노무비·기타경비): 앵커 열 = col 29/38 = 토목 열과 동일
-    anchor_label = mapping.ANCHOR_LABEL[item]
-    _, anc_col = cell_text_search(ws, anchor_label)
+
+    anc_row, anc_col = cell_text_search(ws, mapping.ANCHOR_LABEL[item])
+
+    if item in ("간접노무비", "기타경비"):
+        col = _kind_col_by_header(ws, item, src_kind, anc_row, anc_col)
+        if col is not None:
+            return col
+        if (kind or src_kind) == "전기통신소방전문":
+            return anc_col      # 파일 기본 업종 열
+        raise LookupError(
+            f"'{src_kind}' 공사종류의 {item} 열을 이 제비율 파일에서 찾지 못함 — "
+            f"해당 공사종류에 맞는 제비율 파일인지 확인하세요")
+
     return anc_col
 
 
@@ -147,7 +192,7 @@ def table_rate(path, item, kind, size, duration, contract=None):
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = find_data_sheet(wb)
 
-    col = _col_for_item_kind(ws, item, src_kind)
+    col = _col_for_item_kind(ws, item, src_kind, kind)
 
     if item in ("일반관리비", "이윤"):
         # 기간 무관; 공사원가 기준 규모 행 (SIZE_BASE_ROW_ILBAN) 사용
