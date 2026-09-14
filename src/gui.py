@@ -3,7 +3,8 @@ import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from src.mapping import KINDS
+from src.mapping import KINDS, SANAN_KIND_DEFAULT, default_sanan_kind
+from src.lookup import SANAN_KINDS
 from src.hwp_reader import read_hwp
 from src import nomu_model
 
@@ -32,6 +33,19 @@ def validate_inputs(raw: dict) -> dict:
     if not raw.get("jebiyul_path"):
         raise ValueError("제비율 파일을 선택하세요.")
 
+    est_raw = (raw.get("est_cost") or "").replace(",", "").strip()
+    if est_raw:
+        try:
+            est_cost = int(est_raw)
+        except ValueError:
+            raise ValueError(f"추정금액은 숫자여야 합니다: {est_raw!r}")
+    else:
+        est_cost = None
+
+    sanan_kind = raw.get("sanan_kind") or default_sanan_kind(kind)
+    if sanan_kind not in SANAN_KINDS:
+        raise ValueError(f"산안비 공사종류를 선택하세요(허용: {list(SANAN_KINDS)}).")
+
     return {
         "jikjeop_cost": as_int("jikjeop_cost", "직접공사비"),
         "days": as_int("days", "공사기간(일)"),
@@ -40,6 +54,8 @@ def validate_inputs(raw: dict) -> dict:
         "sanjae_basis": raw["sanjae_basis"],
         "sanan_target": as_int("sanan_target", "산안비 대상액"),
         "jebiyul_path": raw["jebiyul_path"],
+        "sanan_kind": sanan_kind,
+        "est_cost": est_cost,
     }
 
 
@@ -93,10 +109,11 @@ def run_app(on_submit):
         pass
 
     vars_ = {k: tk.StringVar() for k in
-             ["jikjeop_cost", "days", "sanan_target", "jebiyul_path"]}
+             ["jikjeop_cost", "days", "sanan_target", "est_cost", "jebiyul_path"]}
     kind = tk.StringVar(value=KINDS[1])
     contract = tk.StringVar(value="경쟁")
     sanjae = tk.StringVar(value="한전")
+    sanan_kind = tk.StringVar(value=default_sanan_kind(KINDS[1]))
     hwp_path = tk.StringVar()
     jebiyul_label = tk.StringVar(value=_shorten(""))
     hwp_label = tk.StringVar(value=_shorten(""))
@@ -168,7 +185,8 @@ def run_app(on_submit):
 
     for i, (lab, key) in enumerate([("직접공사비(원)", "jikjeop_cost"),
                                     ("공사기간(일)", "days"),
-                                    ("산안비 대상액(원)", "sanan_target")]):
+                                    ("산안비 대상액(원)", "sanan_target"),
+                                    ("추정금액(원)", "est_cost")]):
         ttk.Label(info, text=lab).grid(row=i, column=0, sticky="w",
                                        pady=2, padx=(0, PAD))
         ttk.Entry(info, textvariable=vars_[key], width=ENTRY_W,
@@ -181,6 +199,23 @@ def run_app(on_submit):
                                        pady=2, padx=(PAD * 2, PAD))
         ttk.Combobox(info, textvariable=var, values=vals, state="readonly",
                      width=12).grid(row=i, column=3, sticky="w", pady=2)
+
+    # 산안비 공사종류: 고용노동부 고시 분류(제비율 공사종류와 1:1 아님).
+    # 공사종류를 바꾸면 기본값이 따라오되, 분리발주/부대공사에 따라 직접 바꿀 수 있다.
+    ttk.Label(info, text="(선택 — 산안비 50억 이상 구간의 800억 기준 판정용)",
+              foreground="#777").grid(row=3, column=2, columnspan=2, sticky="w",
+                                      pady=2, padx=(PAD * 2, 0))
+
+    ttk.Label(info, text="산안비 공사종류").grid(row=4, column=0, sticky="w",
+                                          pady=(PAD, 2), padx=(0, PAD))
+    ttk.Combobox(info, textvariable=sanan_kind, values=list(SANAN_KINDS),
+                 state="readonly", width=14).grid(row=4, column=1, sticky="w",
+                                                  pady=(PAD, 2))
+    ttk.Label(info, text="(조경·전기·통신·소방을 분리발주·독립수행하면 특수건설공사)",
+              foreground="#777").grid(row=4, column=2, columnspan=2,
+                                      sticky="w", pady=(PAD, 2), padx=(PAD * 2, 0))
+    kind.trace_add("write",
+                   lambda *_a: sanan_kind.set(default_sanan_kind(kind.get())))
 
     # ── 3. 직종 선택 ────────────────────────────────────────────────
     nomu = ttk.LabelFrame(outer, text=" 직종 선택 ", padding=PAD)
@@ -234,7 +269,7 @@ def run_app(on_submit):
     def submit():
         raw = {k: v.get() for k, v in vars_.items()}
         raw.update(kind=kind.get(), contract=contract.get(),
-                   sanjae_basis=sanjae.get())
+                   sanjae_basis=sanjae.get(), sanan_kind=sanan_kind.get())
         try:
             params = validate_inputs(raw)
         except ValueError as e:

@@ -6,6 +6,7 @@
 from dataclasses import dataclass, field
 
 from src import lookup
+from src import mapping
 from src import params as P
 
 NOTE = "[조달청 공사 원가계산 제비율 변경 '24.6.27. 적용]"
@@ -85,11 +86,11 @@ _IYUN_COMP = [("50억원 미만", "10억미만"), ("50억원 이상 ~ 300억원 
 _IYUN_SUUI = [("1000억원 미만", "50-300억"), ("1000억원 이상", "1000억이상")]
 
 
-def _sanan_table(path, target):
+def _sanan_table(path, target, sanan_kind, est_cost=None):
     applied = P.sanan_band(target)
     rows = []
     for label, band in _SANAN_BANDS:
-        info = lookup.sanan_rate(path, band)
+        info = lookup.sanan_rate(path, band, sanan_kind, est_cost)
         if info.get("기초액"):
             cell_rate = (f"{pct(info['rate'])}%+{info['기초액'] / 1000:,.0f}천원", 4, 6, None)
         elif not info["rate"]:
@@ -100,7 +101,8 @@ def _sanan_table(path, target):
                             highlight=(band == applied)))
     return BandTable(
         kind="sanan",
-        headers=[("공사규모(대상액)별", 2, 3), ("적    용    율[특수 및 기타 적용]", 4, 6),
+        headers=[("공사규모(대상액)별", 2, 3),
+                 (f"적    용    율[{sanan_kind} 적용]", 4, 6),
                  ("적  용  기  준", 7, 10)],
         rows=rows,
         criterion=_SANAN_CRITERION,
@@ -301,7 +303,10 @@ def build(params: dict, rates: dict, jebiyul_path: str | None = None) -> list:
     # 아. 산안비
     b.append(SubHeader(" 아. 산업안전보건관리비"))
     if jebiyul_path:
-        b.append(_sanan_table(jebiyul_path, params["sanan_target"]))
+        b.append(_sanan_table(
+            jebiyul_path, params["sanan_target"],
+            params.get("sanan_kind") or mapping.default_sanan_kind(params["kind"]),
+            params.get("est_cost")))
     b.append(NoteLines([
         "    ☞ 공사규모(대상액)별 적용기준 : 재료비(사급재료비 포함) + 직접노무비",
         "    ☞ 계상금액 : [지입재료비+직접노무비] × 적용율 × 1.2 와",

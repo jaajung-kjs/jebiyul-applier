@@ -110,3 +110,94 @@ def test_sanan_5_50eok_legacy_filetext(tomok_path):
     r = sanan_rate(tomok_path, "5억~50억미만")
     assert r["rate"] == pytest.approx(0.0253, abs=1e-4)
     assert r["기초액"] == 3_300_000
+
+
+# ── Fix: 산안비 공사종류별 요율 (기존엔 항상 '토목공사' 행만 읽었음) ─────────
+# 파일 분류 근거(제비율 주석): [특수건설공사] = 조경공사 / 전기·정보통신·소방·
+# 문화재수리공사업법에 의한 공사 중 분리발주·독립수행. 비고2) 건축·토목·중건설과
+# 부대하여 현장 내에서 이뤄지면 모공사 종류를 따른다.
+
+def test_sanan_rate_by_kind_5eok_miman(tomok_path):
+    """5억 미만 구간: 구분별 요율이 모두 달라야 한다."""
+    f = lambda k: sanan_rate(tomok_path, "5억미만", k)["rate"]
+    assert f("건축공사") == pytest.approx(0.0311)
+    assert f("토목공사") == pytest.approx(0.0315)
+    assert f("중건설공사") == pytest.approx(0.0364)
+    assert f("특수건설공사") == pytest.approx(0.0207)
+
+
+def test_sanan_rate_by_kind_5_50eok(tomok_path):
+    f = lambda k: sanan_rate(tomok_path, "5-50억", k)["rate"]
+    assert f("건축공사") == pytest.approx(0.0228)
+    assert f("토목공사") == pytest.approx(0.0253)
+    assert f("특수건설공사") == pytest.approx(0.0159)
+
+
+def test_sanan_rate_by_kind_50eok_isang(tomok_path):
+    f = lambda k: sanan_rate(tomok_path, "50억이상", k)["rate"]
+    assert f("건축공사") == pytest.approx(0.0237)
+    assert f("토목공사") == pytest.approx(0.026)
+    assert f("특수건설공사") == pytest.approx(0.0164)
+
+
+def test_sanan_rate_defaults_to_tomok(tomok_path):
+    """회귀 방지: 인수를 생략하면 기존 동작(토목공사)과 같아야 한다."""
+    assert sanan_rate(tomok_path, "5억미만")["rate"] == pytest.approx(0.0315)
+
+
+def test_sanan_rate_unknown_kind_raises(tomok_path):
+    with pytest.raises(ValueError):
+        sanan_rate(tomok_path, "5억미만", "없는공사")
+
+
+# ── Fix: 산재보험료 조달청 요율을 파일에서 읽는다 ────────────────────────────
+# 파일에 [산재보험료] 앵커 + '(노) x 3.56' 셀이 있고, 주석에 한전 3.656%가 적혀 있다.
+# 기존에는 조달청을 3.626%로 하드코딩해 파일값(3.56%)과 어긋났다.
+
+def test_sanjae_jodalcheong_reads_file(tomok_path):
+    assert sanjae_rate("조달청", tomok_path) == pytest.approx(0.0356)
+
+
+def test_sanjae_jodalcheong_reads_file_geonchuk(geonchuk_path):
+    assert sanjae_rate("조달청", geonchuk_path) == pytest.approx(0.0356)
+
+
+def test_sanjae_hanjeon_is_policy_constant(tomok_path):
+    """한전은 파일 표 기준이 아니므로 정책 상수(3.656%)를 유지한다."""
+    assert sanjae_rate("한전", tomok_path) == pytest.approx(0.03656)
+
+
+def test_sanjae_without_path_uses_fallback():
+    """경로 없이 호출하면(레거시 경로) 정책 상수로 동작한다."""
+    assert sanjae_rate("조달청") == pytest.approx(0.03626)
+    assert sanjae_rate("한전") == pytest.approx(0.03656)
+
+
+# ── Fix: 산안비 50억이상 구간의 800억 sub-band ──────────────────────────────
+# 파일은 '50억 이상'을 추정금액 800억 미만/이상 두 블록으로 나눈다.
+# 기존 구현은 항상 앞(800억 미만) 블록만 반환했다.
+
+def test_sanan_50eok_under_800(tomok_path):
+    r = sanan_rate(tomok_path, "50억이상", "토목공사")
+    assert r["rate"] == pytest.approx(0.026)
+
+
+def test_sanan_50eok_over_800(tomok_path):
+    """추정금액 800억 이상이면 뒤 블록 요율을 써야 한다."""
+    r = sanan_rate(tomok_path, "50억이상", "토목공사", est_cost=80_000_000_000)
+    assert r["rate"] == pytest.approx(0.0273)
+
+
+def test_sanan_50eok_over_800_by_kind(tomok_path):
+    f = lambda k: sanan_rate(tomok_path, "50억이상", k,
+                             est_cost=90_000_000_000)["rate"]
+    assert f("건축공사") == pytest.approx(0.0264)
+    assert f("중건설공사") == pytest.approx(0.0339)
+    assert f("특수건설공사") == pytest.approx(0.0178)
+
+
+def test_sanan_est_cost_ignored_below_50eok(tomok_path):
+    """50억 미만 구간에서는 추정금액이 영향을 주지 않는다."""
+    a = sanan_rate(tomok_path, "5억미만", "토목공사")["rate"]
+    b = sanan_rate(tomok_path, "5억미만", "토목공사", est_cost=90_000_000_000)["rate"]
+    assert a == b == pytest.approx(0.0315)

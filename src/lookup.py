@@ -167,16 +167,29 @@ def table_rate(path, item, kind, size, duration, contract=None):
 # 산재보험료 / 공구손료 (순수 상수)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# 경로 없이 호출되는 레거시 경로용 폴백값.
+# 한전은 제비율 표의 기준이 아니라 주석에만 있는 값이라 정책 상수로 유지한다.
 _SANJAE = {"한전": 0.03656, "조달청": 0.03626}
 
 
-def sanjae_rate(basis: str) -> float:
+def sanjae_rate(basis: str, path: str | None = None) -> float:
     """산재보험료율 (소수) — basis ∈ {'한전', '조달청'}.
 
-    한전: 3.656 %,  조달청: 3.626 % (정책 고정값).
+    조달청 기준은 제비율 파일의 [산재보험료] 앵커 주변 '(노) x <요율>' 셀에서
+    읽는다(고용·건강·연금 등 다른 고정요율과 동일한 방식). 파일 경로가 없거나
+    파싱에 실패하면 폴백 상수를 쓴다.
+    한전 기준은 표 기준이 아니라 파일 주석의 안내값이므로 정책 상수를 유지한다.
     """
     if basis not in _SANJAE:
         raise ValueError(f"알 수 없는 산재 기준: {basis!r}. 유효값: {list(_SANJAE)}")
+    if basis == "조달청" and path:
+        try:
+            wb = openpyxl.load_workbook(path, data_only=True)
+            ws = find_data_sheet(wb)
+            anc_row, anc_col = cell_text_search(ws, "[산재보험료]")
+            return _formula_rate_near(ws, anc_row, anc_col) / 100.0
+        except LookupError:
+            pass          # 앵커/패턴 없으면 폴백 상수
     return _SANJAE[basis]
 
 
@@ -301,8 +314,15 @@ _SANAN_CANONICAL_TO_FILE: dict[str, str | None] = {
 }
 
 
-def sanan_rate(path: str, target_band: str) -> dict:
-    """산안비 대상액 구간별 토목공사 요율과 기초액을 반환한다.
+SANAN_KINDS = ("건축공사", "토목공사", "중건설공사", "특수건설공사")
+
+
+SANAN_EST_THRESHOLD = 80_000_000_000   # 추정금액 800억 (파일의 sub-band 경계)
+
+
+def sanan_rate(path: str, target_band: str, sanan_kind: str = "토목공사",
+               est_cost: int | None = None) -> dict:
+    """산안비 대상액 구간·공사종류별 요율과 기초액을 반환한다.
 
     Parameters
     ----------
@@ -328,11 +348,12 @@ def sanan_rate(path: str, target_band: str) -> dict:
     "50억이상" 구간은 파일 내에서 두 개의 sub-band로 분리된다:
       - 추정금액 800억 미만 (rate ≈ 2.6%)
       - 추정금액 800억 이상 (rate ≈ 2.73%)
-    현재 구현은 첫 번째 매칭(800억 미만 sub-band)만 반환하므로,
-    800억 이상 공사에 대해서는 반환값이 부정확하다.
-    해당 구간을 구분하려면 target_band를 "50억이상/800억이상" 등으로
-    확장하는 별도 처리가 필요하다.
+    est_cost가 800억 이상이면 뒤 블록을, 아니면 앞 블록을 사용한다.
     """
+    if sanan_kind not in SANAN_KINDS:
+        raise ValueError(
+            f"알 수 없는 산안비 공사종류: {sanan_kind!r}. 유효값: {list(SANAN_KINDS)}")
+
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = find_data_sheet(wb)
 
@@ -385,17 +406,33 @@ def sanan_rate(path: str, target_band: str) -> dict:
     if band_row is None:
         raise LookupError(f"산안비 구간 '{target_band}'을 찾지 못함")
 
-    # 4. 해당 구간 내에서 토목공사 행 탐색
+    # 3-1. '50억 이상' 구간의 추정금액 800억 sub-band 선택.
+    #      파일은 band_row 아래에 '추정금액 800억 미만/이상' 두 블록을 둔다.
+    search_from = band_row
+    if est_cost is not None and est_cost >= SANAN_EST_THRESHOLD:
+        for r in range(band_row, band_row + 20):
+            for c in range(anc_col, type_col + 1):
+                v = ws.cell(r, c).value
+                if isinstance(v, str):
+                    t = v.replace(" ", "")
+                    if "800억" in t and "이상" in t:
+                        search_from = r
+                        break
+            if search_from != band_row:
+                break
+
+    # 4. 해당 구간 내에서 지정한 공사종류 행 탐색
     tomok_row = None
-    for r in range(band_row, band_row + 10):
+    for r in range(search_from, search_from + 10):
         v = ws.cell(r, type_col).value
-        if isinstance(v, str) and "토목" in v:
+        if isinstance(v, str) and v.replace(" ", "") == sanan_kind:
             tomok_row = r
             break
 
     if tomok_row is None:
         raise LookupError(
-            f"산안비 구간 '{target_band}' 내 토목공사 행을 찾지 못함 (band_row={band_row})"
+            f"산안비 구간 '{target_band}' 내 '{sanan_kind}' 행을 찾지 못함 "
+            f"(band_row={band_row})"
         )
 
     # 5. 요율 읽기 (% → 소수 변환)
@@ -449,13 +486,16 @@ def compute_rates(path: str, params: dict) -> dict:
     return {
         "간접노무비":         table_rate(path, "간접노무비",   kind, size, dur),
         "공구손료":           gonggu_rate(),
-        "산재보험료":         sanjae_rate(params["sanjae_basis"]),
+        "산재보험료":         sanjae_rate(params["sanjae_basis"], path),
         "고용보험료":         fixed_rate(path, "고용보험료"),
         "건강보험료":         fixed_rate(path, "건강보험료"),
         "연금보험료":         fixed_rate(path, "연금보험료"),
         "퇴직공제부금비":     fixed_rate(path, "퇴직공제부금비"),
         "노인장기요양보험료": fixed_rate(path, "노인장기요양보험료"),
-        "산업안전보건관리비": sanan_rate(path, sanan)["rate"],
+        "산업안전보건관리비": sanan_rate(
+            path, sanan,
+            params.get("sanan_kind") or mapping.default_sanan_kind(kind),
+            params.get("est_cost"))["rate"],
         "기타경비":           table_rate(path, "기타경비",     kind, size, dur),
         "일반관리비":         table_rate(path, "일반관리비",   kind, size, dur),
         "이윤":               table_rate(path, "이윤",         kind, size, dur, contract),
