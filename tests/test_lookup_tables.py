@@ -111,3 +111,46 @@ def test_iyun_suui_over_1000_hardcoded(tomok_path):
 def test_tomok_ilban_10_50eok_merged(tomok_path):
     # 10-50억 → SIZE_BASE_ROW_ILBAN=15 (BD15:BK30 merged, probe 확인: BD15=8)
     assert table_rate(tomok_path, "일반관리비", "토목", "10-50억", "183") == pytest.approx(0.08)
+
+
+# ── Fix 4: 전기·통신·소방·전문 일반관리비 전용 열 ────────────────────────────
+# 제비율 파일 주석: "전기∙통신∙소방∙전문 및 기타공사의 경우 일반관리비요율을 제외한
+# 각종 요율은 토목, 건축 등 관련 공사업종에 따라 적용" — 즉 일반관리비만 전문 열.
+# 전문 열(토목파일 col64 / 건축파일 col63)은 종합 열과 구간별 요율이 다르다.
+
+def test_jeonmun_ilban_uses_specialty_column_tomok(tomok_path):
+    """전문 일반관리비: 종합(8/8/6.5/5/4.5)이 아니라 전문(8/6.5/5/4.5/4.5)."""
+    f = lambda s: table_rate(tomok_path, "일반관리비", "전기통신소방전문", s, "183")
+    assert f("10억미만") == pytest.approx(0.08)
+    assert f("10-50억") == pytest.approx(0.065)      # 종합이면 0.08
+    assert f("50-300억") == pytest.approx(0.05)      # 종합이면 0.065
+    assert f("300-1000억") == pytest.approx(0.045)   # 종합이면 0.05
+    assert f("1000억이상") == pytest.approx(0.045)
+
+
+def test_jeonmun_ilban_uses_specialty_column_geonchuk(geonchuk_path):
+    """건축 파일은 열 위치가 달라도(전문 col63) 헤더로 찾아 동작해야 한다."""
+    f = lambda s: table_rate(geonchuk_path, "일반관리비", "전기통신소방전문", s, "183")
+    assert f("10-50억") == pytest.approx(0.065)
+    assert f("50-300억") == pytest.approx(0.05)
+
+
+def test_jeonmun_other_items_still_use_general_column(tomok_path):
+    """일반관리비 외 항목은 그대로 토목 종합열을 쓴다(파일 주석 규칙)."""
+    assert (table_rate(tomok_path, "간접노무비", "전기통신소방전문", "10억미만", "183")
+            == table_rate(tomok_path, "간접노무비", "토목", "10억미만", "183"))
+
+
+def test_general_kinds_ilban_unchanged(tomok_path, geonchuk_path):
+    """회귀 방지: 종합 공사종류의 일반관리비 값은 기존과 동일해야 한다."""
+    g = lambda s: table_rate(tomok_path, "일반관리비", "토목", s, "183")
+    assert [g(s) for s in ("10억미만", "10-50억", "50-300억", "300-1000억", "1000억이상")] == \
+           [pytest.approx(x) for x in (0.08, 0.08, 0.065, 0.05, 0.045)]
+    assert table_rate(geonchuk_path, "일반관리비", "건축", "10-50억", "183") == pytest.approx(0.08)
+
+
+def test_iyun_unchanged_after_row_remap(tomok_path):
+    """회귀 방지: 이윤도 SIZE_BASE_ROW_ILBAN을 쓰므로 값이 그대로여야 한다."""
+    g = lambda s: table_rate(tomok_path, "이윤", "토목", s, "183", "경쟁")
+    assert [g(s) for s in ("10억미만", "10-50억", "50-300억", "300-1000억", "1000억이상")] == \
+           [pytest.approx(x) for x in (0.15, 0.15, 0.12, 0.10, 0.09)]

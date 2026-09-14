@@ -48,12 +48,49 @@ def find_data_sheet(wb):
     raise LookupError("'[간접노무비]' 앵커가 있는 데이터 시트를 찾지 못함 — 제비율 양식 불일치")
 
 
+def _merged_value(ws, row, col):
+    """셀 값. 병합 영역 내부(좌상단이 아닌) 칸이면 좌상단 값으로 해석한다.
+
+    제비율표는 같은 요율이 걸친 구간을 병합해 두므로, 대표 행이 병합 내부에
+    떨어져도 값을 읽을 수 있어야 한다.
+    """
+    v = ws.cell(row=row, column=col).value
+    if v is not None:
+        return v
+    for m in ws.merged_cells.ranges:
+        if m.min_row <= row <= m.max_row and m.min_col <= col <= m.max_col:
+            return ws.cell(row=m.min_row, column=m.min_col).value
+    return None
+
+
+def _ilban_jeonmun_col(ws):
+    """일반관리비 '전문·전기·통신·소방·기타' 전용 열을 헤더 텍스트로 찾는다.
+
+    열 번호는 파일마다 다르므로(토목 col64 / 건축 col63) 하드코딩하지 않는다.
+    """
+    for row in ws.iter_rows():
+        for c in row:
+            v = c.value
+            if not isinstance(v, str):
+                continue
+            t = v.replace(" ", "").replace("\n", "")
+            if (t.startswith("전문") and len(t) <= 20
+                    and "전기" in t and "통신" in t and "소방" in t):
+                return c.column
+    raise LookupError(
+        "일반관리비 '전문·전기·통신·소방' 열 헤더를 찾지 못함 — 제비율 양식 불일치")
+
+
 def _col_for_item_kind(ws, item, src_kind):
     """항목·종류에 맞는 데이터 열 번호(1-base)를 반환한다.
 
     간접노무비·기타경비는 종류별로 열이 다르므로 DATA_COL 직접 참조.
     일반관리비·이윤(및 DATA_COL에 없는 건축 계열)은 해당 항목 앵커 열 = 데이터 열.
+    단, 전기·통신·소방·전문 공사의 일반관리비는 전용 열을 쓴다(파일 주석 규칙:
+    "일반관리비요율을 제외한 각종 요율은 토목, 건축 등 관련 공사업종에 따라 적용").
     """
+    if item == "일반관리비" and src_kind == "전기통신소방전문":
+        return _ilban_jeonmun_col(ws)
     key = (item, src_kind)
     if key in mapping.DATA_COL:
         return mapping.DATA_COL[key]
@@ -118,7 +155,7 @@ def table_rate(path, item, kind, size, duration, contract=None):
     else:
         row = mapping.SIZE_BASE_ROW[size] + mapping.DURATION_OFFSET[duration]
 
-    raw = ws.cell(row=row, column=col).value
+    raw = _merged_value(ws, row, col)
     if raw is None:
         raise LookupError(
             f"{item}/{kind}/{size}/{duration} 위치(row={row}, col={col}) 값이 비어 있음"
