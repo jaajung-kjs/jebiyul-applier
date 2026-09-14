@@ -47,7 +47,7 @@ def _stub_lookup(monkeypatch):
     """build()가 부르는 모든 제비율 조회를 가짜로 대체(파일 불필요)."""
     import src.sheet_model as SM
     monkeypatch.setattr(SM.lookup, "sanan_rate",
-                        lambda p, band: {"rate": 0.0315, "기초액": None})
+                        lambda *a, **k: {"rate": 0.0315, "기초액": None})
     monkeypatch.setattr(SM.lookup, "table_rate", lambda *a, **k: 0.12)
 
 
@@ -66,7 +66,7 @@ def test_sanan_2천만미만_shows_적용제외(monkeypatch):
     """2천만원 미만 구간은 0.00% 대신 '적용제외'로 표기한다."""
     import src.sheet_model as SM
 
-    def fake_sanan(path, band):
+    def fake_sanan(path, band, *a, **k):
         return {"rate": 0.0, "기초액": None} if band == "2천만미만" \
             else {"rate": 0.0315, "기초액": None}
 
@@ -131,7 +131,7 @@ def test_ilban_table_is_file_driven_and_highlights_size(monkeypatch):
 
     monkeypatch.setattr(SM.lookup, "table_rate", fake_table_rate)
     monkeypatch.setattr(SM.lookup, "sanan_rate",
-                        lambda p, band: {"rate": 0.0315, "기초액": None})
+                        lambda *a, **k: {"rate": 0.0315, "기초액": None})
     params = dict(PARAMS, jikjeop_cost=7_000_000_000)  # 70억 → 50-300억
     blocks = M.build(params, RATES, jebiyul_path="DUMMY")
     t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "ilban"][0]
@@ -227,7 +227,7 @@ def test_gibon_uses_actual_size_band_not_collapsed(monkeypatch):
 
     monkeypatch.setattr(SM.lookup, "table_rate", fake_table_rate)
     monkeypatch.setattr(SM.lookup, "sanan_rate",
-                        lambda p, band: {"rate": 0.0315, "기초액": None})
+                        lambda *a, **k: {"rate": 0.0315, "기초액": None})
     params = dict(PARAMS, jikjeop_cost=3_000_000_000, days=120)  # 30억 → 10-50억, 183일
     blocks = M.build(params, RATES, jebiyul_path="DUMMY")
     t = [b for b in blocks if isinstance(b, M.BandTable) and b.kind == "gibon"][0]
