@@ -160,7 +160,11 @@ def _emit_table(ws, block, cur):
             value, c0, c1, fmt, rowspan = _norm_cell(cell)
             # 강조는 단일 행 셀에만. 세로 병합된 규모/구분 라벨은 강조색 제외.
             fill = styles.highlight_fill() if (brow.highlight and rowspan == 1) else None
-            _put(ws, r, c0, c1, value, fill=fill, align=styles.center(),
+            # 세로 병합 셀(규모 라벨 등)은 줄바꿈 허용 — '50억 ~ 300억 미만'처럼 긴
+            # 라벨이 좁은 열(B=10.2)에 들어가는데, 병합 셀은 Excel에서 옆칸으로
+            # 넘쳐 보이지 않아 잘린다. 병합으로 세로 여유가 있으므로 wrap이 안전.
+            _put(ws, r, c0, c1, value, fill=fill,
+                 align=styles.center(wrap=(rowspan > 1)),
                  border=True, fmt=fmt, rowspan=rowspan)
     last = cur.row - 1
     # 적용기준 세로 병합 블록(G:J)
