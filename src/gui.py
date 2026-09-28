@@ -98,15 +98,31 @@ def _bind_wheel(canvas):
     canvas.bind("<Leave>", leave)
 
 
+def _fit_to_screen(root, shrinkable, margin=90, min_list_h=90):
+    """창이 화면 작업영역을 넘지 않게 맞춘다.
+
+    Windows는 폰트가 넓고 DPI 배율(125·150%)이 흔해 같은 레이아웃이라도 창이
+    훨씬 커진다. 넘치면 늘어나도 되는 영역(직종 목록)을 줄여 '적용근거 생성'
+    버튼이 화면 밖으로 밀리지 않게 한다.
+    """
+    root.update_idletasks()
+    avail_h = max(320, root.winfo_screenheight() - margin)
+    avail_w = root.winfo_screenwidth()
+    over = root.winfo_reqheight() - avail_h
+    if over > 0:
+        cur = shrinkable.winfo_reqheight()
+        shrinkable.configure(height=max(min_list_h, cur - over))
+        root.update_idletasks()
+    root.maxsize(avail_w, avail_h)
+    root.minsize(min(560, avail_w), min(480, avail_h))
+
+
 def run_app(on_submit):
     """tkinter 입력창을 띄우고 검증 후 on_submit(params)를 호출한다."""
     root = tk.Tk()
     root.title("적용근거 생성기")
-    root.minsize(560, 640)
-    try:
-        root.call("tk", "scaling", 1.2)      # 고DPI에서 글자 뭉개짐 완화
-    except tk.TclError:
-        pass
+    # tk scaling은 건드리지 않는다 — Windows는 시스템 DPI 배율을 Tk가 이미 반영하므로
+    # 여기서 더 키우면 이중 확대되어 창이 화면을 넘는다.
 
     vars_ = {k: tk.StringVar() for k in
              ["jikjeop_cost", "days", "sanan_target", "est_cost", "jebiyul_path"]}
@@ -296,4 +312,5 @@ def run_app(on_submit):
     run_btn = ttk.Button(run, text="적용근거 생성", command=submit)
     run_btn.grid(row=0, column=0, sticky="e", ipadx=PAD * 2, ipady=2)
 
+    _fit_to_screen(root, nomu_canvas)
     root.mainloop()
