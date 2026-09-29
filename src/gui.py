@@ -60,18 +60,23 @@ def validate_inputs(raw: dict) -> dict:
 
 PAD = 8          # 위젯 간 기본 여백
 ENTRY_W = 22     # 입력칸 문자 폭
-PATH_W = 46      # 파일명 라벨의 고정 폭(문자 단위) — 긴 경로가 창을 늘리지 못하게
+PATH_W = 54      # 파일명 라벨의 고정 폭(문자 단위) — 긴 경로가 창을 늘리지 못하게
 NAME_MAX = 24    # 표시 글자 수 상한(한글은 폭이 넓어 라벨을 넘지 않게 보수적으로)
 
+# 파일을 고르기 전에 보여줄 예시 — 어떤 확장자·어떤 문서인지 바로 알 수 있게 한다.
+EX_JEBIYUL = "미선택 — 예) 붙임2. 토목공사 간접공사비 적용기준.xlsx"
+EX_NOMU = "미선택 — 예) [붙임] 2026년 상반기 건설업 임금실태조사.hwp"
+PICKED = "선택됨 — "          # 실제 파일이 들어왔을 때의 접두어
 
-def _shorten(path, limit=NAME_MAX):
+
+def _shorten(path, limit=NAME_MAX, placeholder=""):
     """전체 경로 대신 파일명만, 길면 앞부분을 남기고 말줄임.
 
     라벨 폭을 고정(PATH_W)하고 글자 수도 제한해, 경로 길이가 창 크기를 좌우하지
     않게 한다. 파일 식별에 유리하도록 뒤가 아니라 앞을 남긴다.
     """
     if not path:
-        return "선택된 파일 없음"
+        return placeholder
     name = os.path.basename(path)
     return name if len(name) <= limit else name[:limit - 1] + "…"
 
@@ -130,9 +135,9 @@ def run_app(on_submit):
     sanjae = tk.StringVar(value="한전")
     sanan_kind = tk.StringVar(value=default_sanan_kind(KINDS[1]))
     hwp_path = tk.StringVar()
-    jebiyul_label = tk.StringVar(value=_shorten(""))
-    hwp_label = tk.StringVar(value=_shorten(""))
-    count_label = tk.StringVar(value="hwp 파일을 선택하면 직종 목록이 표시됩니다.")
+    jebiyul_label = tk.StringVar(value=EX_JEBIYUL)
+    hwp_label = tk.StringVar(value=EX_NOMU)
+    count_label = tk.StringVar(value="")
     nomu_vars: dict = {}
 
     outer = ttk.Frame(root, padding=PAD + 2)
@@ -150,13 +155,15 @@ def run_app(on_submit):
             title="제비율 파일 선택", filetypes=[("Excel 파일", "*.xlsx")])
         if p:
             vars_["jebiyul_path"].set(p)
-            jebiyul_label.set(_shorten(p))
+            jebiyul_label.set(PICKED + _shorten(p))
+            jebiyul_lbl.configure(foreground="#0f172a")
 
     ttk.Label(files, text="제비율").grid(row=0, column=0, sticky="w")
     ttk.Button(files, text="파일 선택…", command=pick, width=12).grid(
         row=0, column=1, padx=PAD)
-    ttk.Label(files, textvariable=jebiyul_label, width=PATH_W,
-              anchor="w", foreground="#444").grid(row=0, column=2, sticky="w")
+    jebiyul_lbl = ttk.Label(files, textvariable=jebiyul_label, width=PATH_W,
+                            anchor="w", foreground="#94a3b8")
+    jebiyul_lbl.grid(row=0, column=2, sticky="w")
 
     def pick_hwp():
         p = filedialog.askopenfilename(
@@ -170,12 +177,14 @@ def run_app(on_submit):
             report = read_hwp(p)
         except Exception as e:
             hwp_path.set("")
-            hwp_label.set(_shorten(""))
-            count_label.set("hwp 파일을 선택하면 직종 목록이 표시됩니다.")
+            hwp_label.set(EX_NOMU)
+            hwp_lbl.configure(foreground="#94a3b8")
+            count_label.set("")
             messagebox.showerror("hwp 읽기 실패", str(e))
             return
         hwp_path.set(p)
-        hwp_label.set(_shorten(p))
+        hwp_label.set(PICKED + _shorten(p))
+        hwp_lbl.configure(foreground="#0f172a")
         for name in report.order:
             var = tk.BooleanVar(value=False)   # 기본 미체크 — 필요한 직종만 직접 선택
             var.trace_add("write", lambda *_a: _refresh_count())
@@ -187,13 +196,13 @@ def run_app(on_submit):
     ttk.Label(files, text="노무임").grid(row=1, column=0, sticky="w", pady=(PAD, 0))
     ttk.Button(files, text="파일 선택…", command=pick_hwp, width=12).grid(
         row=1, column=1, padx=PAD, pady=(PAD, 0))
-    ttk.Label(files, textvariable=hwp_label, width=PATH_W,
-              anchor="w", foreground="#444").grid(
-        row=1, column=2, sticky="w", pady=(PAD, 0))
-    ttk.Label(files, text="(선택 — 넣으면 7.통신노무임 시트가 함께 생성됩니다)",
-              foreground="#777").grid(row=2, column=0, columnspan=3,
-                                      sticky="w", pady=(4, 0))
+    hwp_lbl = ttk.Label(files, textvariable=hwp_label, width=PATH_W,
+                        anchor="w", foreground="#94a3b8")
+    hwp_lbl.grid(row=1, column=2, sticky="w", pady=(PAD, 0))
 
+    ttk.Label(files, text="⚠  두 파일 모두 DRM 해제 후 저장한 것을 선택해야 정상 첨부됩니다",
+              foreground="#b91c1c").grid(row=2, column=0, columnspan=3,
+                                         sticky="w", pady=(PAD, 0))
     # ── 2. 공사 정보 ────────────────────────────────────────────────
     info = ttk.LabelFrame(outer, text=" 공사 정보 ", padding=PAD)
     info.grid(row=1, column=0, sticky="ew", pady=(PAD + 2, 0))
@@ -275,7 +284,7 @@ def run_app(on_submit):
 
     def _refresh_count():
         if not nomu_vars:
-            count_label.set("hwp 파일을 선택하면 직종 목록이 표시됩니다.")
+            count_label.set("")
             return
         n = sum(1 for v in nomu_vars.values() if v.get())
         count_label.set(f"{n} / {len(nomu_vars)} 직종 선택됨")
