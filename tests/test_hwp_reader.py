@@ -102,3 +102,27 @@ def test_read_hwp_fail_loud_on_non_hwp(tmp_path):
     bad.write_text("not hwp")
     with pytest.raises(HwpFormatError):
         read_hwp(str(bad))
+
+
+# ── 각주 문구 다듬기 ──────────────────────────────────────────────────────
+# 기준 값(5개 미만 등)은 hwp 원문에서 읽되, 산출물에 남길 필요 없는
+# 교차참조 꼬리('…이므로 그 적용은 6페이지…참고')와 '직종임' 말투는 정리한다.
+
+def test_marker_notes_are_tidied(hwp_path):
+    notes = read_hwp(hwp_path).marker_notes
+    assert notes["*"].endswith("직종")          # '직종임' 아님
+    assert "5개 미만" in notes["*"]             # 기준 값은 원문 유지(띄어쓰기만 정리)
+    assert notes["**"].endswith("조사되지 않은 직종")
+    for v in notes.values():                    # 교차참조 꼬리 제거
+        assert "참고하시기" not in v
+        assert "페이지" not in v
+
+
+def test_tidy_legend_keeps_source_number():
+    """기준 숫자는 원문 그대로 — 보고서가 바뀌면 그대로 따라간다."""
+    from src.hwp_reader import _tidy_legend
+    assert _tidy_legend("주)「*」표시 직종은 조사현장수가 3개미만 직종임") \
+        == "주)「*」표시 직종은 조사현장수가 3개 미만 직종"
+    assert _tidy_legend("「**」표시 직종은 조사되지 않은 직종이므로 그 적용은 "
+                        "'6페이지 4.참고사항 라.'를 참고하시기 바람") \
+        == "「**」표시 직종은 조사되지 않은 직종"
