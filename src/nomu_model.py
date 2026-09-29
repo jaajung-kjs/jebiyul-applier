@@ -8,16 +8,6 @@ from src.hwp_reader import BUMUN_ORDER
 
 _ROMAN = ("Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ")
 
-# 통신공사 표준세트(프리체크 기본값). 이름은 hwp 표기와 정확히 일치해야 한다
-# (test_standard_set_names_exist_in_hwp가 강제).
-STANDARD_SET = (
-    "보통인부", "특별인부", "비계공", "배관공", "기계설비공", "인력운반공", "화물차운전사",
-    "내선전공", "송전전공", "배전전공", "저압케이블전공", "계장공",
-    "통신내선공", "통신외선공", "통신설비공", "무선안테나공", "광케이블설치사",
-    "H/W시험사", "S/W시험사",
-    "지적기사", "지적기능사", "통신관련산업기사", "전기공사기사",
-)
-
 
 @dataclass(frozen=True)
 class NomuTitle:
@@ -58,15 +48,6 @@ class NomuAvg:
 class NomuFootnote:
     lines: list
 
-
-def standard_set():
-    return list(STANDARD_SET)
-
-
-def preselect(all_names, standard=None):
-    """(직종명, 체크여부) 쌍을 보고서 순서대로. 표준세트만 True."""
-    std = set(standard if standard is not None else STANDARD_SET)
-    return [(n, n in std) for n in all_names]
 
 
 def _delta(rate):

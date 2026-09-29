@@ -3,10 +3,9 @@ import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from src.mapping import KINDS, SANAN_KIND_DEFAULT, default_sanan_kind
+from src.mapping import KINDS, default_sanan_kind
 from src.lookup import SANAN_KINDS
 from src.hwp_reader import read_hwp
-from src import nomu_model
 
 
 def validate_inputs(raw: dict) -> dict:
@@ -177,8 +176,8 @@ def run_app(on_submit):
             return
         hwp_path.set(p)
         hwp_label.set(_shorten(p))
-        for name, on in nomu_model.preselect(list(report.order)):
-            var = tk.BooleanVar(value=on)
+        for name in report.order:
+            var = tk.BooleanVar(value=False)   # 기본 미체크 — 필요한 직종만 직접 선택
             var.trace_add("write", lambda *_a: _refresh_count())
             nomu_vars[name] = var
             ttk.Checkbutton(nomu_frame, text=name, variable=var).pack(

@@ -11,6 +11,11 @@ from src.lookup import compute_rates
 from src import builder
 
 
+# 2시트 테스트용 표본 직종(부문 3개가 모두 나오도록 구성)
+SAMPLE_NOMU = ["보통인부", "특별인부", "통신설비공", "통신내선공",
+               "광케이블설치사", "H/W시험사", "전기공사기사", "통신관련산업기사"]
+
+
 @pytest.fixture
 def base_params(tomok_path):
     return dict(
@@ -68,13 +73,12 @@ def test_build_output_no_template_dependency(tmp_path, tomok_path):
 def test_build_output_two_sheets(tmp_path, tomok_path, hwp_path):
     from src import builder
     from src.lookup import compute_rates
-    from src.nomu_model import standard_set
     params = dict(kind="토목", jikjeop_cost=500_000_000, days=200,
                   contract="경쟁", sanjae_basis="한전", sanan_target=400_000_000)
     rates = compute_rates(tomok_path, params)
     out = str(tmp_path / "two.xlsx")
     builder.build_output(rates, out, params=params, jebiyul_path=tomok_path,
-                         hwp_path=hwp_path, selected_nomu=standard_set())
+                         hwp_path=hwp_path, selected_nomu=SAMPLE_NOMU)
     wb = openpyxl.load_workbook(out)
     assert "7.통신노무임" in wb.sheetnames
     assert "8.적용근거" in wb.sheetnames

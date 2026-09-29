@@ -3,13 +3,6 @@ from src.hwp_reader import read_hwp
 from src import nomu_model as N
 
 
-def test_standard_set_names_exist_in_hwp(hwp_path):
-    """표준세트 직종명이 실제 hwp에 전부 존재해야(오탈자 방지)."""
-    rep = read_hwp(hwp_path)
-    missing = [n for n in N.standard_set() if n not in rep.rates]
-    assert missing == [], f"hwp에 없는 표준세트 직종: {missing}"
-
-
 def test_build_groups_and_delta(hwp_path):
     rep = read_hwp(hwp_path)
     blocks = N.build(rep, ["보통인부", "통신설비공", "전기공사기사"])
@@ -62,16 +55,3 @@ def test_build_sets_past_count_from_dates(hwp_path):
     avgs = [b for b in blocks if isinstance(b, N.NomuAvg)]
     assert groups and all(g.past_count == expected_p for g in groups)
     assert avgs and all(a.past_count == expected_p for a in avgs)
-
-
-def test_preselect_marks_standard(hwp_path):
-    rep = read_hwp(hwp_path)
-    pairs = N.preselect(list(rep.order))
-    checked = {n for n, on in pairs if on}
-    assert "통신설비공" in checked
-    assert "보통인부" in checked
-    # 비표준(예: 도편수 등 국가유산)은 기본 미체크
-    unchecked = {n for n, on in pairs if not on}
-    assert unchecked, "표준세트 밖 직종은 미체크로 남아야"
-    # 순서 보존
-    assert [n for n, _ in pairs] == list(rep.order)
