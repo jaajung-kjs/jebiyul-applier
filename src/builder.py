@@ -43,7 +43,7 @@ def build_output(rates: dict, out_path: str, params: dict | None = None,
         jebiyul_path:  제비율 파일 경로. params와 함께 있어야 구간표를 채운다.
         template_path: (deprecated) 과거 템플릿 복사 방식 호환용 인자, 무시된다.
         hwp_path:      임금실태조사 hwp 경로. selected_nomu와 함께 있어야
-                       '7.통신노무임' 시트가 추가된다.
+                       '시중노무임' 시트가 추가된다.
         selected_nomu: nomu_model.build에 넘길 선택 직종명 리스트.
 
     Returns:
@@ -57,9 +57,9 @@ def build_output(rates: dict, out_path: str, params: dict | None = None,
     blocks7 = nomu_model.build(report, selected_nomu)
     wb = Workbook()
     wb.remove(wb.active)
-    renderer.render_sheet(wb.create_sheet("7.통신노무임"), blocks7,
+    renderer.render_sheet(wb.create_sheet("시중노무임"), blocks7,
                           styles.NOMU_COL_WIDTHS)
-    renderer.render_sheet(wb.create_sheet("8.적용근거"), blocks8)
+    renderer.render_sheet(wb.create_sheet("적용근거"), blocks8)
     wb.save(out_path)
     return out_path
 

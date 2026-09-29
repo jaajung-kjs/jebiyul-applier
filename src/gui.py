@@ -1,5 +1,7 @@
 """tkinter 입력창과 입력 검증."""
 import os
+import queue
+import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
@@ -301,24 +303,52 @@ def run_app(on_submit):
             return
         params["hwp_path"] = hwp_path.get() or None
         params["selected_nomu"] = [n for n, v in nomu_vars.items() if v.get()] or None
+
+        # 생성은 수 초~수십 초 걸린다. 같은 스레드에서 돌리면 창이 멈춘 것처럼
+        # 보이므로, 작업은 별도 스레드에 맡기고 화면에는 진행 표시를 띄운다.
         run_btn.state(["disabled"])
-        root.update_idletasks()
+        status.set("생성 중…  파일을 읽고 시트를 그리고 있습니다")
+        prog.grid()
+        prog.start(12)
+        result = queue.Queue()
+
+        def work():
+            try:
+                result.put(("ok", on_submit(params)))
+            except Exception as e:          # noqa: BLE001 - 사용자에게 그대로 보여준다
+                result.put(("err", e))
+
+        threading.Thread(target=work, daemon=True).start()
+        root.after(120, lambda: _poll(result, params))
+
+    def _poll(result, params):
+        """작업 스레드 결과를 기다린다(위젯은 메인 스레드에서만 건드린다)."""
         try:
-            out = on_submit(params)
-            if params.get("selected_nomu"):
-                messagebox.showinfo("완료", f"생성 완료 (7.통신노무임 포함)\n\n{out}")
-            else:
-                messagebox.showinfo("완료", f"생성 완료\n\n{out}")
-        except Exception as e:
-            messagebox.showerror("생성 실패", str(e))
-        finally:
-            run_btn.state(["!disabled"])
+            kind_, payload = result.get_nowait()
+        except queue.Empty:
+            root.after(120, lambda: _poll(result, params))
+            return
+        prog.stop()
+        prog.grid_remove()
+        status.set("")
+        run_btn.state(["!disabled"])
+        if kind_ == "ok":
+            extra = " (시중노무임 시트 포함)" if params.get("selected_nomu") else ""
+            messagebox.showinfo("완료", f"생성 완료{extra}\n\n{payload}")
+        else:
+            messagebox.showerror("생성 실패", str(payload))
 
     run = ttk.Frame(outer)
     run.grid(row=3, column=0, sticky="ew", pady=(PAD + 2, 0))
-    run.columnconfigure(0, weight=1)
+    run.columnconfigure(1, weight=1)
+    status = tk.StringVar(value="")
+    ttk.Label(run, textvariable=status, foreground="#1d4ed8").grid(
+        row=0, column=0, sticky="w")
+    prog = ttk.Progressbar(run, mode="indeterminate", length=150)
+    prog.grid(row=0, column=1, sticky="w", padx=PAD)
+    prog.grid_remove()                      # 평소엔 숨겨 둔다
     run_btn = ttk.Button(run, text="적용근거 생성", command=submit)
-    run_btn.grid(row=0, column=0, sticky="e", ipadx=PAD * 2, ipady=2)
+    run_btn.grid(row=0, column=2, sticky="e", ipadx=PAD * 2, ipady=2)
 
     _fit_to_screen(root, nomu_canvas)
     root.mainloop()

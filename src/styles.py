@@ -1,4 +1,4 @@
-"""PIU 8.적용근거에서 추출한 스타일 팔레트. 렌더러가 셀에 입히는 폰트·채움·테두리·정렬·치수."""
+"""PIU 적용근거 시트에서 추출한 스타일 팔레트. 렌더러가 셀에 입히는 폰트·채움·테두리·정렬·치수."""
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 
 BODY_FONT_NAME = "맑은 고딕"

@@ -2,6 +2,7 @@ import openpyxl
 from openpyxl import Workbook
 from src import sheet_model as M
 from src import renderer
+from src import styles
 
 
 def _blocks():
