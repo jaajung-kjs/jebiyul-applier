@@ -80,9 +80,9 @@ def test_build_output_two_sheets(tmp_path, tomok_path, hwp_path):
     builder.build_output(rates, out, params=params, jebiyul_path=tomok_path,
                          hwp_path=hwp_path, selected_nomu=SAMPLE_NOMU)
     wb = openpyxl.load_workbook(out)
-    assert "7.통신노무임" in wb.sheetnames
-    assert "8.적용근거" in wb.sheetnames
-    v7 = [c.value for row in wb["7.통신노무임"].iter_rows()
+    assert "시중노무임" in wb.sheetnames
+    assert "적용근거" in wb.sheetnames
+    v7 = [c.value for row in wb["시중노무임"].iter_rows()
           for c in row if c.value not in (None, "")]
     assert any("시중노무임 산출" in str(x) for x in v7)  # 제목
     assert any("일반공사직종" in str(x) for x in v7)  # 부문 그룹 헤더
