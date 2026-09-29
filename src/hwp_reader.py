@@ -199,20 +199,35 @@ def _read_paragraphs(path):
     return out
 
 
-def _marker_legends(paras):
-    """직종번호 마커(*,**) 설명 문장을 hwp 각주에서 그대로 읽어온다.
+def _tidy_legend(text):
+    """각주 문구를 산출물용으로 다듬는다. 기준 값 자체는 hwp 원문 그대로 둔다.
 
-    기준 문구('5개 미만' 등)를 하드코딩하지 않고 원문을 쓰므로, 보고서가 기준을
-    바꿔도 자동 반영된다. 전용 각주 줄만 고른다:
+    - '…직종이므로 그 적용은 「6페이지…」를 참고하시기 바람' 같은 교차참조 꼬리 제거
+      (원문 문서 안에서만 뜻이 통하는 안내라 산출물에 남길 필요가 없다)
+    - 문장 끝 '직종임' → '직종'
+    - '5개미만' → '5개 미만' 띄어쓰기(숫자는 원문 값 그대로)
+    """
+    s = text.split("이므로")[0].strip()
+    s = re.sub(r"직종임$", "직종", s)
+    s = re.sub(r"(\d+개)\s*미만", r"\1 미만", s)
+    return s
+
+
+def _marker_legends(paras):
+    """직종번호 마커(*,**) 설명 문장을 hwp 각주에서 읽어온다.
+
+    기준 문구('5개 미만' 등)를 하드코딩하지 않고 원문에서 가져오므로, 보고서가
+    기준을 바꿔도 자동 반영된다. 전용 각주 줄만 고른다:
     - '*' 줄: 「*」는 있고 「**」는 없는 문단
     - '**' 줄: 「**」는 있고 「*」는 없는 문단(둘 다 든 통합 안내문은 제외)
+    문구는 _tidy_legend로 다듬어 반환한다.
     """
     notes = {}
     for t in paras:
         s = t.strip()
         has1, has2 = ("「*」" in s), ("「**」" in s)
         if has2 and not has1 and "**" not in notes:
-            notes["**"] = s
+            notes["**"] = _tidy_legend(s)
         elif has1 and not has2 and "*" not in notes:
-            notes["*"] = s
+            notes["*"] = _tidy_legend(s)
     return notes
